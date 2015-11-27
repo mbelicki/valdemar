@@ -1,0 +1,19 @@
+name:                valdemar
+version:             0.1.0.0
+synopsis:            A simple compier of very simple language called Valdemar 
+description:         Please see README.md
+homepage:            http://github.com/mbelicki/valdemar#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Mateusz Belicki 
+maintainer:          _@belickim.net
+copyright:           2015 Mateusz Belicki
+category:            Compiler
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable valdemar
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
