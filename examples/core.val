@@ -7,12 +7,15 @@ val N int_t = 8
 val name str_t = "valdemar"
 
 -- defining functions
-val add_two (a int_t) -> int_t = { 
+fn add_two (a int_t) -> int_t { 
     ret a + 2
 }
 
+-- C imports
+ext_c sin(double_t d) -> double_t
+
 -- program entry
-val start () -> ini_t = {
+fn start () -> ini_t {
     val a int_t = add_two(2)
     puts(name)
     ret 0
