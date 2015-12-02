@@ -1,0 +1,12 @@
+
+fn sq (a double_t) -> double_t {
+    ret a * a
+}
+
+fn add_sq (a double_t, b double_t) -> double_t {
+    ret sq(a) + sq(b)
+}
+
+fn inc (a double_t) -> double_t {
+    ret a + 1.0
+}
