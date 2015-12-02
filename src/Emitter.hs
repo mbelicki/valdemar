@@ -102,18 +102,25 @@ emmitExpression (S.BinOp op a b)
                 opA <- emmitExpression a
                 opB <- emmitExpression b
                 instr opA opB
+emmitExpression (S.Call fun args)
+    = do
+        argSymbols <- M.mapM emmitExpression args
+        let funSybmol = CG.extern CG.double $ LLVM.Name fun
+        CG.call funSybmol argSymbols
 
-generate :: [S.Expr] -> IO LLVM.Module
-generate defs = LLVM.Ctx.withContext $ \context ->
+generate :: String -> String -> [S.Expr] -> IO LLVM.Module
+generate name outPath defs = LLVM.Ctx.withContext $ \context ->
   liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
     llstr <- LLVM.Module.moduleLLVMAssembly m
     putStrLn llstr
+    let outFile = LLVM.Module.File outPath
+    liftError $ LLVM.Module.writeLLVMAssemblyToFile outFile m
     return newAst
   where
     liftError :: Except.ExceptT String IO a -> IO a
     liftError = Except.runExceptT M.>=> either fail return
 
-    mod = CG.emptyModule "hello"
+    mod = CG.emptyModule name
     modn = mapM generateSingleDef defs
     newAst = CG.buildModule mod modn
 

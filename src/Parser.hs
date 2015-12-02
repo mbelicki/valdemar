@@ -107,6 +107,6 @@ toplevel = many (function <|> value)
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
 
-parseToplevel :: String -> Either ParseError [Expr]
-parseToplevel = parse (contents toplevel) "<stdin>"
+parseModule :: String -> Either ParseError [Expr]
+parseModule = parse (contents toplevel) "<stdin>"
 
