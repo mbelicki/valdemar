@@ -45,15 +45,27 @@ value = do
   body <- expr
   return $ ValDecl name typeName body
 
+functionDeclType :: Parser ([FunArg], TypeName)
+functionDeclType = do
+    args <- parens $ commaSep funArg
+    reserved "->"
+    retType <- identifier
+    return (args, retType)
+
 function :: Parser Expr
 function = do
   reserved "fn"
   name <- identifier
-  args <- parens $ commaSep funArg
-  reserved "->"
-  retType <- identifier
+  (args, retType) <- functionDeclType
   body <- braces $ many statement
   return $ FunDecl name args retType body
+
+extFunction :: Parser Expr
+extFunction = do
+  reserved "ext_c"
+  name <- identifier
+  (args, retType) <- functionDeclType
+  return $ ExtFunDecl name args retType
 
 call :: Parser Expr
 call = do
@@ -66,6 +78,7 @@ anyExpr = try floating
       <|> try int
       <|> try value
       <|> try function
+      <|> try extFunction
       <|> try call
       <|> variable
       <|> parens expr
@@ -102,7 +115,7 @@ contents p = do
   return r
 
 toplevel :: Parser [Expr]
-toplevel = many (function <|> value)
+toplevel = many (function <|> extFunction <|> value)
 
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"

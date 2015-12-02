@@ -1,3 +1,4 @@
+-- this is the first code ever written and compiled in valdemar
 
 fn sq (a double_t) -> double_t {
     ret a * a
@@ -9,4 +10,10 @@ fn add_sq (a double_t, b double_t) -> double_t {
 
 fn inc (a double_t) -> double_t {
     ret a + 1.0
+}
+
+ext_c sin (a double_t) -> double_t
+
+fn cos_sq (a double_t) -> double_t {
+    ret 1.0 - sq(sin(a))
 }

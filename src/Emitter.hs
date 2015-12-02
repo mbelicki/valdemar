@@ -77,6 +77,12 @@ generateSingleDef (S.FunDecl name args retType body)
                     --CG.ret
             CG.define CG.double name funArgs blocks
 
+generateSingleDef (S.ExtFunDecl name args retType)
+    = case transformFuncArgs args of
+        Left _ -> return () -- return this error higher
+        Right funArgs -> CG.external CG.double name funArgs
+    
+
 emmitStatement :: S.Statement -> CG.CodeGenerator ()
 emmitStatement (S.Return n)
     = do

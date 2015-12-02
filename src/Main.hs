@@ -15,7 +15,7 @@ compileFile path
         let outPath = path ++ ".ll"
         let ast = P.parseModule sourceFile
         case ast of
-            Right a -> M.void $ E.generate sourceFile outPath a
+            Right a -> M.void $ E.generate "test" outPath a
             Left err -> putStrLn $ "Parsing error: " ++ show err
 
 main :: IO ()

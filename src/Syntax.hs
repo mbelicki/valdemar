@@ -14,7 +14,7 @@ data Expr
     | Var Name
     | ValDecl Name TypeName Expr
     | FunDecl Name [FunArg] TypeName [Statement]
-    | ExtFunDecl Name [Expr] TypeName
+    | ExtFunDecl Name [FunArg] TypeName
     | Call Name [Expr]
     deriving (Eq, Ord, Show)
 
