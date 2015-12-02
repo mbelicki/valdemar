@@ -30,11 +30,11 @@ floating = M.liftM Float float
 variable :: Parser Expr
 variable = M.liftM Var identifier
 
-typedVar :: Parser Expr
-typedVar = do
+funArg :: Parser FunArg
+funArg = do
     name <- identifier
     typeName <- identifier
-    return $ TypedVar name typeName
+    return $ FunArg name typeName
 
 value :: Parser Expr
 value = do
@@ -49,7 +49,7 @@ function :: Parser Expr
 function = do
   reserved "fn"
   name <- identifier
-  args <- parens $ commaSep typedVar
+  args <- parens $ commaSep funArg
   reserved "->"
   retType <- identifier
   body <- braces $ many statement
