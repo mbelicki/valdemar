@@ -83,12 +83,25 @@ emmitStatement (S.Return n)
         emmitExpression n >>= CG.ret
         return ()
 
---emmitStatement (S.DeclStatement n) = return $ cons $ LLVM.Const.Float (LLVM.Float.Double n)
---emmitStatement (S.CallStatement n) = return $ cons $ LLVM.Const.Float (LLVM.Float.Double n)
+operators = Map.fromList 
+    [ (S.Add, CG.fadd)
+    , (S.Sub, CG.fsub)
+    , (S.Mul, CG.fmul)
+    , (S.Div, CG.fdiv)
+    ]
 
 emmitExpression :: S.Expr -> CG.CodeGenerator LLVM.Operand
 emmitExpression (S.Float n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
 emmitExpression (S.Integer n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
+emmitExpression (S.Var n) = CG.getLocal n >>= CG.load
+emmitExpression (S.BinOp op a b)
+    = case Map.lookup op operators of
+        Nothing -> error "TODO: fail gracefully when operator is missing."
+        Just instr ->
+            do
+                opA <- emmitExpression a
+                opB <- emmitExpression b
+                instr opA opB
 
 generate :: [S.Expr] -> IO LLVM.Module
 generate defs = LLVM.Ctx.withContext $ \context ->
