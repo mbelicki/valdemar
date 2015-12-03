@@ -17,3 +17,9 @@ ext_c sin (a double_t) -> double_t
 fn cos_sq (a double_t) -> double_t {
     ret 1.0 - sq(sin(a))
 }
+
+fn locals() -> double_t {
+    val pi double_t = 3.14
+    val a double_t = cos_sq(pi)
+    ret a * pi * 2.0
+}

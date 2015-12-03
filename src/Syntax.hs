@@ -5,21 +5,25 @@ type TypeName = String
 
 data Operation = Add | Sub | Mul | Div deriving (Eq, Ord, Show)
 
-data FunArg = FunArg Name TypeName deriving (Eq, Ord, Show)
+data FunctionArgument
+    = FunArg Name TypeName deriving (Eq, Ord, Show)
+data FunctionDeclaration
+    = FunDecl Name [FunctionArgument] TypeName deriving (Eq, Ord, Show)
+data ValueDeclaration
+    = ValDecl Name TypeName Expression deriving (Eq, Ord, Show)
 
-data Expr
-    = Integer Int
-    | Float Double
-    | BinOp Operation Expr Expr
-    | Var Name
-    | ValDecl Name TypeName Expr
-    | FunDecl Name [FunArg] TypeName [Statement]
-    | ExtFunDecl Name [FunArg] TypeName
-    | Call Name [Expr]
+data Expression
+    = IntegerExpr Int
+    | FloatExpr Double
+    | BinOpExpr Operation Expression Expression
+    | VarExpr Name
+    | ValDeclExpr ValueDeclaration
+    | FunDeclExpr FunctionDeclaration [Statement]
+    | ExtFunDeclExpr FunctionDeclaration 
+    | CallExpr Name [Expression]
     deriving (Eq, Ord, Show)
 
 data Statement
-    = Return Expr
-    | DeclStatement Expr
-    | CallStatement Expr
+    = ReturnStmt Expression
+    | ExpressionStmt Expression
     deriving (Eq, Ord, Show)

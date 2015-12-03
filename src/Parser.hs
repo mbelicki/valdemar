@@ -11,7 +11,7 @@ import qualified Control.Monad as M
 import Lexer
 import Syntax
 
-binary symbol function = E.Infix (operator symbol >> return (BinOp function))
+binary symbol function = E.Infix (operator symbol >> return (BinOpExpr function))
 
 table = [ [ binary "*" Mul E.AssocLeft
           , binary "/" Div E.AssocLeft
@@ -21,59 +21,61 @@ table = [ [ binary "*" Mul E.AssocLeft
           ]
         ]
 
-int :: Parser Expr
-int = M.liftM (Integer . fromInteger) integer
+int :: Parser Expression
+int = M.liftM (IntegerExpr . fromInteger) integer
 
-floating :: Parser Expr
-floating = M.liftM Float float
+floating :: Parser Expression
+floating = M.liftM FloatExpr float
 
-variable :: Parser Expr
-variable = M.liftM Var identifier
+variable :: Parser Expression
+variable = M.liftM VarExpr identifier
 
-funArg :: Parser FunArg
+funArg :: Parser FunctionArgument
 funArg = do
     name <- identifier
     typeName <- identifier
     return $ FunArg name typeName
 
-value :: Parser Expr
-value = do
-  reserved "val"
-  name <- identifier
-  typeName <- identifier
-  reserved "="
-  body <- expr
-  return $ ValDecl name typeName body
+valueDecl :: Parser ValueDeclaration
+valueDecl = do
+    reserved "val"
+    name <- identifier
+    typeName <- identifier
+    reserved "="
+    body <- expr
+    return $ ValDecl name typeName body
 
-functionDeclType :: Parser ([FunArg], TypeName)
-functionDeclType = do
+value :: Parser Expression
+value = M.liftM ValDeclExpr valueDecl
+
+functionDecl :: Parser FunctionDeclaration
+functionDecl = do
+    name <- identifier
     args <- parens $ commaSep funArg
     reserved "->"
     retType <- identifier
-    return (args, retType)
+    return $ FunDecl name args retType
 
-function :: Parser Expr
+function :: Parser Expression
 function = do
   reserved "fn"
-  name <- identifier
-  (args, retType) <- functionDeclType
+  decl <- functionDecl
   body <- braces $ many statement
-  return $ FunDecl name args retType body
+  return $ FunDeclExpr decl body
 
-extFunction :: Parser Expr
+extFunction :: Parser Expression
 extFunction = do
   reserved "ext_c"
-  name <- identifier
-  (args, retType) <- functionDeclType
-  return $ ExtFunDecl name args retType
+  decl <- functionDecl
+  return $ ExtFunDeclExpr decl 
 
-call :: Parser Expr
+call :: Parser Expression
 call = do
   name <- identifier
   args <- parens $ commaSep expr
-  return $ Call name args
+  return $ CallExpr name args
 
-anyExpr :: Parser Expr
+anyExpr :: Parser Expression
 anyExpr = try floating
       <|> try int
       <|> try value
@@ -83,29 +85,23 @@ anyExpr = try floating
       <|> variable
       <|> parens expr
 
-expr :: Parser Expr
+expr :: Parser Expression
 expr = E.buildExpressionParser table anyExpr
 
-statementReturn :: Parser Statement
-statementReturn = do
+returnStmt :: Parser Statement
+returnStmt = do
     reserved "ret" 
     e <- expr
-    return $ Return e
+    return $ ReturnStmt e
 
-statementDecl :: Parser Statement
-statementDecl = do
-    e <- value <|> function
-    return $ DeclStatement e
-
-statementCall :: Parser Statement
-statementCall = do
-    e <- call
-    return $ CallStatement e
+expressionStmt :: Parser Statement
+expressionStmt = do
+    e <- value <|> call
+    return $ ExpressionStmt e
 
 statement :: Parser Statement
-statement = try statementReturn
-        <|> try statementCall
-        <|> try statementDecl
+statement = try returnStmt
+        <|> try expressionStmt
 
 contents :: Parser a -> Parser a
 contents p = do
@@ -114,12 +110,12 @@ contents p = do
   eof
   return r
 
-toplevel :: Parser [Expr]
+toplevel :: Parser [Expression]
 toplevel = many (function <|> extFunction <|> value)
 
-parseExpr :: String -> Either ParseError Expr
+parseExpr :: String -> Either ParseError Expression
 parseExpr = parse (contents expr) "<stdin>"
 
-parseModule :: String -> Either ParseError [Expr]
+parseModule :: String -> Either ParseError [Expression]
 parseModule = parse (contents toplevel) "<stdin>"
 

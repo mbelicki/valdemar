@@ -5,6 +5,7 @@ extern double add_sq(double a, double b);
 extern double sq(double a);
 extern double inc(double a);
 extern double cos_sq(double a);
+extern double locals(void);
 
 int main(int argc, char **argv) {
     puts("-- basics: --");
@@ -15,4 +16,7 @@ int main(int argc, char **argv) {
     puts("-- calling c: --");
     printf("cos(2) * cos(2) = %f\n", cos(2) * cos(2));
     printf("      cos_sq(2) = %f\n", cos_sq(2));
+
+    puts("-- locals: --");
+    printf("locals() = %f\n", locals());
 }

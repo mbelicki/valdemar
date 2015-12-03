@@ -38,7 +38,10 @@ builtInTypes
         , ("double_t", CG.double)
         ]
 
-transformArgument :: S.FunArg -> Fallible CG.Argument
+getLLVMType :: S.TypeName -> Maybe LLVM.Type
+getLLVMType n = Map.lookup n builtInTypes
+
+transformArgument :: S.FunctionArgument -> Fallible CG.Argument
 transformArgument (S.FunArg name rawType)
     = failFromMaybe message maybeArgument
         where 
@@ -46,11 +49,11 @@ transformArgument (S.FunArg name rawType)
             maybeType = Map.lookup rawType builtInTypes
             maybeArgument = M.liftM (\a -> (a, LLVM.Name name, name)) maybeType
 
-transformFuncArgs :: [S.FunArg] -> Fallible [CG.Argument]
+transformFuncArgs :: [S.FunctionArgument] -> Fallible [CG.Argument]
 transformFuncArgs
     = foldr fold (Right [])
         where
-            fold :: S.FunArg -> Fallible [CG.Argument] -> Fallible [CG.Argument] 
+            fold :: S.FunctionArgument -> Fallible [CG.Argument] -> Fallible [CG.Argument] 
             fold rawArg otherArgs
                 = let pair = (transformArgument rawArg, otherArgs)
                   in case pair of
@@ -59,8 +62,8 @@ transformFuncArgs
                     (Right _,   Left m) -> Left m
                     (Right arg, Right args) -> Right (args ++ [arg])
 
-generateSingleDef :: S.Expr -> CG.ModuleBuilder ()
-generateSingleDef (S.FunDecl name args retType body)
+generateSingleDef :: S.Expression -> CG.ModuleBuilder ()
+generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body)
     = case transformFuncArgs args of
         Left _ -> return () -- return this error higher
         Right funArgs -> do
@@ -77,17 +80,18 @@ generateSingleDef (S.FunDecl name args retType body)
                     --CG.ret
             CG.define CG.double name funArgs blocks
 
-generateSingleDef (S.ExtFunDecl name args retType)
+generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType))
     = case transformFuncArgs args of
         Left _ -> return () -- return this error higher
         Right funArgs -> CG.external CG.double name funArgs
     
 
 emmitStatement :: S.Statement -> CG.CodeGenerator ()
-emmitStatement (S.Return n)
-    = do
-        emmitExpression n >>= CG.ret
-        return ()
+emmitStatement (S.ReturnStmt n) = do
+    emmitExpression n >>= CG.ret
+    return ()
+
+emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
 
 operators = Map.fromList 
     [ (S.Add, CG.fadd)
@@ -96,11 +100,20 @@ operators = Map.fromList
     , (S.Div, CG.fdiv)
     ]
 
-emmitExpression :: S.Expr -> CG.CodeGenerator LLVM.Operand
-emmitExpression (S.Float n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
-emmitExpression (S.Integer n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
-emmitExpression (S.Var n) = CG.getLocal n >>= CG.load
-emmitExpression (S.BinOp op a b)
+emmitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand
+emmitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
+emmitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
+emmitExpression (S.VarExpr n) = CG.getLocal n >>= CG.load
+emmitExpression (S.ValDeclExpr (S.ValDecl name typeName n)) = do
+    op <- emmitExpression n
+    let Just llvmType = getLLVMType typeName
+        llvmName = LLVM.Name name
+    var <- CG.alloca llvmType 
+    CG.store var op
+    CG.assignLocal name var
+    return var
+    
+emmitExpression (S.BinOpExpr op a b)
     = case Map.lookup op operators of
         Nothing -> error "TODO: fail gracefully when operator is missing."
         Just instr ->
@@ -108,13 +121,13 @@ emmitExpression (S.BinOp op a b)
                 opA <- emmitExpression a
                 opB <- emmitExpression b
                 instr opA opB
-emmitExpression (S.Call fun args)
+emmitExpression (S.CallExpr fun args)
     = do
         argSymbols <- M.mapM emmitExpression args
         let funSybmol = CG.extern CG.double $ LLVM.Name fun
         CG.call funSybmol argSymbols
 
-generate :: String -> String -> [S.Expr] -> IO LLVM.Module
+generate :: String -> String -> [S.Expression] -> IO LLVM.Module
 generate name outPath defs = LLVM.Ctx.withContext $ \context ->
   liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
     llstr <- LLVM.Module.moduleLLVMAssembly m
