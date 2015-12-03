@@ -23,3 +23,10 @@ fn locals() -> double_t {
     val a double_t = cos_sq(pi)
     ret a * pi * 2.0
 }
+
+ext_c print_float (a double_t) -> unit_t
+
+fn side_effects(a double_t) -> unit_t {
+    print_float(a)
+}
+

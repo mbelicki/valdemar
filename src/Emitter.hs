@@ -36,6 +36,7 @@ builtInTypes
     = Map.fromList 
         [ ("int_t",    CG.int)
         , ("double_t", CG.double)
+        , ("unit_t",   CG.void)
         ]
 
 getLLVMType :: S.TypeName -> Maybe LLVM.Type
@@ -77,21 +78,25 @@ generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body)
                         CG.assignLocal rawName var
                     -- emmit code for each statement
                     M.forM_ body $ \s -> emmitStatement s
+                    -- add ret void if returning unit_t
+                    M.when (retType == "unit_t") $ M.void CG.retVoid
                     --CG.ret
-            CG.define CG.double name funArgs blocks
+            let Just llvmType = getLLVMType retType
+            CG.define llvmType name funArgs blocks
 
 generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType))
     = case transformFuncArgs args of
         Left _ -> return () -- return this error higher
-        Right funArgs -> CG.external CG.double name funArgs
+        Right funArgs -> do
+            let Just llvmType = getLLVMType retType
+            CG.external llvmType name funArgs
     
 
 emmitStatement :: S.Statement -> CG.CodeGenerator ()
+emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
 emmitStatement (S.ReturnStmt n) = do
     emmitExpression n >>= CG.ret
     return ()
-
-emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
 
 operators = Map.fromList 
     [ (S.Add, CG.fadd)

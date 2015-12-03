@@ -233,6 +233,9 @@ condBr cond ifTrue ifFalse = terminator $ LLVM.Do $ LLVM.CondBr cond ifTrue ifFa
 ret :: LLVM.Operand -> CodeGenerator (LLVM.Named LLVM.Terminator)
 ret name = terminator $ LLVM.Do $ LLVM.Ret (Just name) []
 
+retVoid :: CodeGenerator (LLVM.Named LLVM.Terminator)
+retVoid = terminator $ LLVM.Do $ LLVM.Ret Nothing []
+
 -- -- Memory and calling
 call :: LLVM.Operand -> [LLVM.Operand] -> CodeGenerator LLVM.Operand
 call func args
@@ -257,4 +260,7 @@ double = LLVM.FloatingPointType 64 LLVM.IEEE
 
 int :: LLVM.Type
 int = LLVM.IntegerType 64
+
+void :: LLVM.Type
+void = LLVM.VoidType
 

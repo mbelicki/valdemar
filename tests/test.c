@@ -6,6 +6,11 @@ extern double sq(double a);
 extern double inc(double a);
 extern double cos_sq(double a);
 extern double locals(void);
+extern void side_effects(double a);
+
+extern void print_float(double a) {
+    printf("%f\n", a);
+}
 
 int main(int argc, char **argv) {
     puts("-- basics: --");
@@ -19,4 +24,8 @@ int main(int argc, char **argv) {
 
     puts("-- locals: --");
     printf("locals() = %f\n", locals());
+
+    puts("-- void: --");
+    puts("calling side_effects(8)");
+    side_effects(8);
 }
