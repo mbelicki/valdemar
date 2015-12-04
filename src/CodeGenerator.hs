@@ -261,6 +261,9 @@ double = LLVM.FloatingPointType 64 LLVM.IEEE
 int :: LLVM.Type
 int = LLVM.IntegerType 64
 
+bool :: LLVM.Type
+bool = LLVM.IntegerType 1
+
 void :: LLVM.Type
 void = LLVM.VoidType
 

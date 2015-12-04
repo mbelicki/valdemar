@@ -13,7 +13,8 @@ data ValueDeclaration
     = ValDecl Name TypeName Expression deriving (Eq, Ord, Show)
 
 data Expression
-    = IntegerExpr Int
+    = BooleanExpr Bool
+    | IntegerExpr Int
     | FloatExpr Double
     | BinOpExpr Operation Expression Expression
     | VarExpr Name

@@ -30,3 +30,24 @@ fn side_effects(a double_t) -> unit_t {
     print_float(a)
 }
 
+fn booleans(a bool_t, b bool_t) -> bool_t {
+    val c bool_t = false
+    ret c
+}
+
+-- fn branching () -> unit_t {
+--     val a int_t = get_a()
+--     val b double_t = cast a double_t
+--     val c double_t = a as double_t 
+--     val d double_t = double_t(a)
+--     val e double_t = double_t <- a
+-- 
+--     if a > 0 print("positive")
+-- 
+--     if a == 0 {
+--         print("not sure if this is a good idea")
+--     } elseif a > 0 {
+--         print("otherwise")
+--     }
+-- }
+

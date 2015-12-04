@@ -36,6 +36,7 @@ builtInTypes
     = Map.fromList 
         [ ("int_t",    CG.int)
         , ("double_t", CG.double)
+        , ("bool_t",   CG.bool)
         , ("unit_t",   CG.void)
         ]
 
@@ -108,6 +109,7 @@ operators = Map.fromList
 emmitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand
 emmitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
 emmitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
+emmitExpression (S.BooleanExpr n) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
 emmitExpression (S.VarExpr n) = CG.getLocal n >>= CG.load
 emmitExpression (S.ValDeclExpr (S.ValDecl name typeName n)) = do
     op <- emmitExpression n

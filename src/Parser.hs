@@ -27,6 +27,13 @@ int = M.liftM (IntegerExpr . fromInteger) integer
 floating :: Parser Expression
 floating = M.liftM FloatExpr float
 
+boolValue :: Parser Bool
+boolValue = (reserved "true"  >> return True)
+        <|> (reserved "false" >> return False)
+
+boolean :: Parser Expression
+boolean = M.liftM BooleanExpr boolValue
+
 variable :: Parser Expression
 variable = M.liftM VarExpr identifier
 
@@ -78,6 +85,7 @@ call = do
 anyExpr :: Parser Expression
 anyExpr = try floating
       <|> try int
+      <|> try boolean
       <|> try value
       <|> try function
       <|> try extFunction
