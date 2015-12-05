@@ -31,4 +31,5 @@ data Statement
     = ReturnStmt Expression
     | ExpressionStmt Expression
     | BlockStmt [Statement]
+    | IfStmt Expression Statement
     deriving (Eq, Ord, Show)

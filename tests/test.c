@@ -9,6 +9,7 @@ extern double cos_sq(double a);
 extern double locals(void);
 extern void side_effects(double a);
 extern bool booleans(bool a, bool b);
+extern void branching(double a, bool more);
 
 extern void print_float(double a) {
     printf("%f\n", a);
@@ -34,4 +35,10 @@ int main(int argc, char **argv) {
     puts("-- booleans: --");
     printf("booleans(true, false) = %s\n", booleans(1, 0) ? "true" : "false");
     printf("true || false && false = %s\n", (true || false && false) ? "true" : "false");
+
+    puts("-- basic branching: --");
+    puts("calling branching(8, true)");
+    branching(8, true);
+    puts("calling branching(8, false)");
+    branching(8, false);
 }

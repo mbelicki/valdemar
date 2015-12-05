@@ -112,10 +112,18 @@ expressionStmt = do
 blockStmt :: Parser Statement
 blockStmt = braces $ M.liftM BlockStmt $ many statement
 
+ifStmt :: Parser Statement
+ifStmt = do
+    reserved "if" 
+    cond <- expr
+    body <- statement
+    return $ IfStmt cond body
+
 statement :: Parser Statement
 statement = try returnStmt
-        <|> try expressionStmt
         <|> try blockStmt
+        <|> try ifStmt
+        <|> try expressionStmt
 
 contents :: Parser a -> Parser a
 contents p = do

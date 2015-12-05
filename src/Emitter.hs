@@ -62,7 +62,7 @@ transformFuncArgs
                     (Left m,    Right _) -> Left m
                     (Left m1,   Left m2) -> Left (m1 ++ "\n" ++ m2)
                     (Right _,   Left m) -> Left m
-                    (Right arg, Right args) -> Right (args ++ [arg])
+                    (Right arg, Right args) -> Right (arg : args)
 
 generateSingleDef :: S.Expression -> CG.ModuleBuilder ()
 generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body)
@@ -95,10 +95,21 @@ generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType))
 
 emmitStatement :: S.Statement -> CG.CodeGenerator ()
 emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
-emmitStatement (S.ReturnStmt n) = do
-    emmitExpression n >>= CG.ret
-    return ()
+emmitStatement (S.ReturnStmt n) = M.void $ emmitExpression n >>= CG.ret
 emmitStatement (S.BlockStmt n) = M.forM_ n $ \s -> emmitStatement s
+emmitStatement (S.IfStmt cond body) = do
+    thenBlock <- CG.addBlock "if.then"
+    endBlock  <- CG.addBlock "if.end"
+
+    condOp <- emmitExpression cond
+    CG.condBr condOp thenBlock endBlock
+
+    CG.setBlock thenBlock
+    emmitStatement body
+    CG.br endBlock
+    
+    CG.setBlock endBlock
+    return ()
 
 operators = Map.fromList 
     [ (S.Add, CG.fadd)

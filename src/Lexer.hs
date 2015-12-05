@@ -8,12 +8,13 @@ import qualified Text.Parsec.Token as Token
 lexer :: Token.TokenParser ()
 lexer = Token.makeTokenParser style
   where
-    opeators = ["+","-","*","/"]
-    keywords = ["val", "fn", "ext_c"]
+    opeators = ["+", "-", "*", "/", "&", "|"]
+    keywords = ["val", "fn", "ext_c", "ret", "if", "not"]
     style = emptyDef
              { Token.commentLine = "--"
              , Token.reservedOpNames = opeators
              , Token.reservedNames = keywords
+             , Token.caseSensitive = True
              }
 
 integer :: Parser Integer
