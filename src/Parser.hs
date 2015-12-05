@@ -21,6 +21,14 @@ table = [ [ prefix "not" LogNot ]
         , [ binary "+" Add E.AssocLeft
           , binary "-" Sub E.AssocLeft
           ]
+        , [ binary "<"  Lt  E.AssocLeft
+          , binary ">"  Gt  E.AssocLeft
+          , binary "<=" Lte E.AssocLeft
+          , binary ">=" Gte E.AssocLeft
+          ]
+        , [ binary "==" Eq  E.AssocLeft
+          , binary "/=" Neq E.AssocLeft
+          ]
         , [ binary "&" BitAnd E.AssocLeft ]
         , [ binary "|" BitOr E.AssocLeft ]
         ]

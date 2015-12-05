@@ -8,7 +8,9 @@ import qualified Text.Parsec.Token as Token
 lexer :: Token.TokenParser ()
 lexer = Token.makeTokenParser style
   where
-    opeators = ["+", "-", "*", "/", "&", "|"]
+    opeators = [ "+", "-", "*", "/", "&", "|"
+               , "==", "/=", "<", "<=", ">", ">="
+               ]
     keywords = ["val", "fn", "ext_c", "ret", "if", "not"]
     style = emptyDef
              { Token.commentLine = "--"

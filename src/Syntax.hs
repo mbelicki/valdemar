@@ -4,9 +4,10 @@ type Name = String
 type TypeName = String
 
 data Operation 
-    = Add | Sub | Mul | Div -- basic arithmetic
-    | BitAnd | BitOr        -- bitwise operations
-    | LogNot                -- logical not
+    = Add | Sub | Mul | Div          -- basic arithmetic
+    | BitAnd | BitOr                 -- bitwise operations
+    | LogNot                         -- logical not
+    | Eq | Neq | Lt | Lte | Gt | Gte -- comparison
     deriving (Eq, Ord, Show)
 
 data FunctionArgument

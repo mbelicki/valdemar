@@ -10,6 +10,7 @@ extern double locals(void);
 extern void side_effects(double a);
 extern bool booleans(bool a, bool b);
 extern void branching(double a, bool more);
+extern void count_down(double a);
 
 extern void print_float(double a) {
     printf("%f\n", a);
@@ -41,4 +42,6 @@ int main(int argc, char **argv) {
     branching(8, true);
     puts("calling branching(8, false)");
     branching(8, false);
+    puts("calling count_down(8)");
+    count_down(8);
 }

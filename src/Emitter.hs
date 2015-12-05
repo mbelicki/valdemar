@@ -117,7 +117,13 @@ binaryOperators = Map.fromList
     , (S.Mul, CG.fmul)
     , (S.Div, CG.fdiv)
     , (S.BitAnd, CG.and)
-    , (S.BitOr , CG.or)
+    , (S.BitOr,  CG.or)
+    , (S.Eq,  CG.feq)
+    , (S.Neq, CG.fneq)
+    , (S.Lt,  CG.flt)
+    , (S.Gt,  CG.fgt)
+    , (S.Lte, CG.fle)
+    , (S.Gte, CG.fge)
     ]
 
 unaryOperators = Map.fromList 

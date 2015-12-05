@@ -8,6 +8,7 @@ import qualified LLVM.General.AST.Constant as LLVM.Const
 import qualified LLVM.General.AST.Attribute as LLVM.Attr
 import qualified LLVM.General.AST.CallingConvention as LLVM.CallConv
 import qualified LLVM.General.AST.IntegerPredicate as LLVM.IntPred
+import qualified LLVM.General.AST.FloatingPointPredicate as LLVM.FloatPred
 
 import qualified Data.Map as Map
 import qualified Data.List as List
@@ -223,6 +224,28 @@ fmul a b = instruction $ LLVM.FMul LLVM.NoFastMathFlags a b []
 
 fdiv :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 fdiv a b = instruction $ LLVM.FDiv LLVM.NoFastMathFlags a b []
+
+floatComparison :: LLVM.FloatPred.FloatingPointPredicate 
+                -> LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+floatComparison pred a b = instruction $ LLVM.FCmp pred a b []
+
+feq :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+feq = floatComparison LLVM.FloatPred.UEQ
+
+fneq :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+fneq = floatComparison LLVM.FloatPred.UNE
+
+flt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+flt = floatComparison LLVM.FloatPred.ULT
+
+fgt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+fgt = floatComparison LLVM.FloatPred.UGT
+
+fle :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+fle = floatComparison LLVM.FloatPred.ULE
+
+fge :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+fge = floatComparison LLVM.FloatPred.UGE
 
 -- -- Integer binary operations
 and :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
