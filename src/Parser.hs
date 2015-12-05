@@ -69,7 +69,7 @@ function :: Parser Expression
 function = do
   reserved "fn"
   decl <- functionDecl
-  body <- braces $ many statement
+  body <- statement
   return $ FunDeclExpr decl body
 
 extFunction :: Parser Expression
@@ -109,9 +109,13 @@ expressionStmt = do
     e <- value <|> call
     return $ ExpressionStmt e
 
+blockStmt :: Parser Statement
+blockStmt = braces $ M.liftM BlockStmt $ many statement
+
 statement :: Parser Statement
 statement = try returnStmt
         <|> try expressionStmt
+        <|> try blockStmt
 
 contents :: Parser a -> Parser a
 contents p = do
@@ -121,7 +125,7 @@ contents p = do
   return r
 
 toplevel :: Parser [Expression]
-toplevel = many (function <|> extFunction <|> value)
+toplevel = many (function <|> extFunction)
 
 parseExpr :: String -> Either ParseError Expression
 parseExpr = parse (contents expr) "<stdin>"

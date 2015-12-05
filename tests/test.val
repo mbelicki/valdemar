@@ -34,6 +34,8 @@ fn booleans(a bool_t, b bool_t) -> bool_t {
     ret a | b & b
 }
 
+fn no_braces(a double_t) -> double_t ret 2.0 * a
+
 -- fn branching () -> unit_t {
 --     val a int_t = get_a()
 --     val b double_t = cast a double_t

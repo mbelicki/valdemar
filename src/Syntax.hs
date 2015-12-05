@@ -22,7 +22,7 @@ data Expression
     | BinOpExpr Operation Expression Expression
     | VarExpr Name
     | ValDeclExpr ValueDeclaration
-    | FunDeclExpr FunctionDeclaration [Statement]
+    | FunDeclExpr FunctionDeclaration Statement
     | ExtFunDeclExpr FunctionDeclaration 
     | CallExpr Name [Expression]
     deriving (Eq, Ord, Show)
@@ -30,4 +30,5 @@ data Expression
 data Statement
     = ReturnStmt Expression
     | ExpressionStmt Expression
+    | BlockStmt [Statement]
     deriving (Eq, Ord, Show)

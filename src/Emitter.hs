@@ -77,8 +77,8 @@ generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body)
                         var <- CG.alloca argType
                         CG.store var (CG.local argType argName)
                         CG.assignLocal rawName var
-                    -- emmit code for each statement
-                    M.forM_ body $ \s -> emmitStatement s
+                    -- emmit code for body
+                    emmitStatement body
                     -- add ret void if returning unit_t
                     M.when (retType == "unit_t") $ M.void CG.retVoid
                     --CG.ret
@@ -98,6 +98,7 @@ emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
 emmitStatement (S.ReturnStmt n) = do
     emmitExpression n >>= CG.ret
     return ()
+emmitStatement (S.BlockStmt n) = M.forM_ n $ \s -> emmitStatement s
 
 operators = Map.fromList 
     [ (S.Add, CG.fadd)
