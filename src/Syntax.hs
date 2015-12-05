@@ -5,7 +5,8 @@ type TypeName = String
 
 data Operation 
     = Add | Sub | Mul | Div -- basic arithmetic
-    | And | Or              -- boolean operations
+    | BitAnd | BitOr        -- bitwise operations
+    | LogNot                -- logical not
     deriving (Eq, Ord, Show)
 
 data FunctionArgument
@@ -19,6 +20,7 @@ data Expression
     = BooleanExpr Bool
     | IntegerExpr Int
     | FloatExpr Double
+    | PrefixOpExpr Operation Expression
     | BinOpExpr Operation Expression Expression
     | VarExpr Name
     | ValDeclExpr ValueDeclaration

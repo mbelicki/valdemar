@@ -11,16 +11,18 @@ import qualified Control.Monad as M
 import Lexer
 import Syntax
 
+prefix symbol function = E.Prefix (operator symbol >> return (PrefixOpExpr function))
 binary symbol function = E.Infix (operator symbol >> return (BinOpExpr function))
 
-table = [ [ binary "*" Mul E.AssocLeft
+table = [ [ prefix "not" LogNot ]
+        , [ binary "*" Mul E.AssocLeft
           , binary "/" Div E.AssocLeft
           ]
         , [ binary "+" Add E.AssocLeft
           , binary "-" Sub E.AssocLeft
           ]
-        , [ binary "&" And E.AssocLeft ]
-        , [ binary "|" Or E.AssocLeft ]
+        , [ binary "&" BitAnd E.AssocLeft ]
+        , [ binary "|" BitOr E.AssocLeft ]
         ]
 
 int :: Parser Expression

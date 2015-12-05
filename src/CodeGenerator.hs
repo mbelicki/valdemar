@@ -7,6 +7,7 @@ import qualified LLVM.General.AST.Global as LLVM.Global
 import qualified LLVM.General.AST.Constant as LLVM.Const
 import qualified LLVM.General.AST.Attribute as LLVM.Attr
 import qualified LLVM.General.AST.CallingConvention as LLVM.CallConv
+import qualified LLVM.General.AST.IntegerPredicate as LLVM.IntPred
 
 import qualified Data.Map as Map
 import qualified Data.List as List
@@ -229,6 +230,12 @@ and a b = instruction $ LLVM.And a b []
 
 or :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 or a b = instruction $ LLVM.Or a b []
+
+-- -- Boolean logic
+logNot :: LLVM.Operand -> CodeGenerator LLVM.Operand
+logNot a = do 
+    let false = CodeGenerator.const $ LLVM.Const.Int 1 0
+    instruction $ LLVM.ICmp LLVM.IntPred.EQ a false []
 
 -- -- Flow control:
 br :: LLVM.Name -> CodeGenerator (LLVM.Named LLVM.Terminator)

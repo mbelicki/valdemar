@@ -111,13 +111,17 @@ emmitStatement (S.IfStmt cond body) = do
     CG.setBlock endBlock
     return ()
 
-operators = Map.fromList 
+binaryOperators = Map.fromList 
     [ (S.Add, CG.fadd)
     , (S.Sub, CG.fsub)
     , (S.Mul, CG.fmul)
     , (S.Div, CG.fdiv)
-    , (S.And, CG.and)
-    , (S.Or , CG.or)
+    , (S.BitAnd, CG.and)
+    , (S.BitOr , CG.or)
+    ]
+
+unaryOperators = Map.fromList 
+    [ (S.LogNot, CG.logNot)
     ]
 
 emmitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand
@@ -133,20 +137,26 @@ emmitExpression (S.ValDeclExpr (S.ValDecl name typeName n)) = do
     CG.store var op
     CG.assignLocal name var
     return var
-    
-emmitExpression (S.BinOpExpr op a b)
-    = case Map.lookup op operators of
+
+emmitExpression (S.PrefixOpExpr op a)
+    = case Map.lookup op unaryOperators of
         Nothing -> error "TODO: fail gracefully when operator is missing."
-        Just instr ->
-            do
-                opA <- emmitExpression a
-                opB <- emmitExpression b
-                instr opA opB
-emmitExpression (S.CallExpr fun args)
-    = do
-        argSymbols <- M.mapM emmitExpression args
-        let funSybmol = CG.extern CG.double $ LLVM.Name fun
-        CG.call funSybmol argSymbols
+        Just instr -> do
+            opA <- emmitExpression a
+            instr opA
+
+emmitExpression (S.BinOpExpr op a b)
+    = case Map.lookup op binaryOperators of
+        Nothing -> error "TODO: fail gracefully when operator is missing."
+        Just instr -> do
+            opA <- emmitExpression a
+            opB <- emmitExpression b
+            instr opA opB
+
+emmitExpression (S.CallExpr fun args) = do
+    argSymbols <- M.mapM emmitExpression args
+    let funSybmol = CG.extern CG.double $ LLVM.Name fun
+    CG.call funSybmol argSymbols
 
 generate :: String -> String -> [S.Expression] -> IO LLVM.Module
 generate name outPath defs = LLVM.Ctx.withContext $ \context ->
