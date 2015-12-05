@@ -12,6 +12,7 @@ import qualified LLVM.General.AST.FloatingPointPredicate as LLVM.FloatPred
 
 import qualified Data.Map as Map
 import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Function as Func
 
 import Control.Monad as M
@@ -208,6 +209,12 @@ terminator term
         block <- currentBlock
         modifyBlock $ block { blockTerm = Just term }
         return term
+
+hasTerminator :: BlockState -> Bool
+hasTerminator = Maybe.isJust . blockTerm
+
+needsTerminator :: BlockState -> Bool
+needsTerminator = Maybe.isNothing . blockTerm
 
 const :: LLVM.Const.Constant -> LLVM.Operand
 const = LLVM.ConstantOperand

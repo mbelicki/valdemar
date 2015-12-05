@@ -11,6 +11,8 @@ extern void side_effects(double a);
 extern bool booleans(bool a, bool b);
 extern void branching(double a, bool more);
 extern void count_down(double a);
+extern double vald_fabs(double a);
+extern bool compare_float(double a, double b, double eps);
 
 extern void print_float(double a) {
     printf("%f\n", a);
@@ -44,4 +46,9 @@ int main(int argc, char **argv) {
     branching(8, false);
     puts("calling count_down(8)");
     count_down(8);
+    printf("     fabs(-3.14) = %f\n", fabs(-3.14));
+    printf("vald_fabs(-3.14) = %f\n", vald_fabs(-3.14));
+    printf( "compare_float(3.14, 3.135, 0.01) = %s\n"
+          , compare_float(3.14, 3.135, 0.01) ? "true" : "false"
+          );
 }

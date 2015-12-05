@@ -106,7 +106,9 @@ emmitStatement (S.IfStmt cond body) = do
 
     CG.setBlock thenBlock
     emmitStatement body
-    CG.br endBlock
+    block <- CG.currentBlock
+    M.when (CG.needsTerminator block) $ 
+        M.void $ CG.br endBlock
     
     CG.setBlock endBlock
     return ()

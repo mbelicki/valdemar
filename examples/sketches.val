@@ -23,7 +23,7 @@ use valdemar.graphics
 
 type_macro(param_t) maybe = sum <val just param_t, val nothing unit_t>
 type_macro(param_t) list = product <
-    mut_val next ptr:list:param_t next,
+    mut_val next ^list:param_t next,
     mut_val value param_t,
 >
 
@@ -71,7 +71,8 @@ fn start () -> int_t = {
 
     val c int_t, i = add_two(a, b)
 
-    val loc ptr:int_t = address_of(a)
+    val loc ^int_t = addr_of a
+    val v int_t = val_of loc
 
     val n number_t = a
 
@@ -81,8 +82,9 @@ fn start () -> int_t = {
         puts("an integer")
     }
 
-    if (divide(a, b) +? just) {
-
+    -- error handling
+    if (divide(a, b) +? nothing) {
+        
     }
 
     puts("hello, world")

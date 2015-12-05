@@ -36,8 +36,17 @@ table = [ [ prefix "not" LogNot ]
 int :: Parser Expression
 int = M.liftM (IntegerExpr . fromInteger) integer
 
+
+sign :: Parser Double
+sign =  (char '-' >> return (-1.0))
+    <|> (char '+' >> return 1.0)
+    <|> return 1.0
+
 floating :: Parser Expression
-floating = M.liftM FloatExpr float
+floating = do 
+    s <- sign
+    value <- float
+    return $ FloatExpr $ s * value
 
 boolValue :: Parser Bool
 boolValue = (reserved "true"  >> return True)
