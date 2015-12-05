@@ -104,6 +104,8 @@ operators = Map.fromList
     , (S.Sub, CG.fsub)
     , (S.Mul, CG.fmul)
     , (S.Div, CG.fdiv)
+    , (S.And, CG.and)
+    , (S.Or , CG.or)
     ]
 
 emmitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand

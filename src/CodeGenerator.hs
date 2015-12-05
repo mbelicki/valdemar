@@ -223,6 +223,13 @@ fmul a b = instruction $ LLVM.FMul LLVM.NoFastMathFlags a b []
 fdiv :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 fdiv a b = instruction $ LLVM.FDiv LLVM.NoFastMathFlags a b []
 
+-- -- Integer binary operations
+and :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+and a b = instruction $ LLVM.And a b []
+
+or :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+or a b = instruction $ LLVM.Or a b []
+
 -- -- Flow control:
 br :: LLVM.Name -> CodeGenerator (LLVM.Named LLVM.Terminator)
 br name = terminator $ LLVM.Do $ LLVM.Br name []

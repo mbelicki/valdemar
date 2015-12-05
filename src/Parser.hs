@@ -19,6 +19,8 @@ table = [ [ binary "*" Mul E.AssocLeft
         , [ binary "+" Add E.AssocLeft
           , binary "-" Sub E.AssocLeft
           ]
+        , [ binary "&" And E.AssocLeft ]
+        , [ binary "|" Or E.AssocLeft ]
         ]
 
 int :: Parser Expression

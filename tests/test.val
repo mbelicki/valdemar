@@ -31,8 +31,7 @@ fn side_effects(a double_t) -> unit_t {
 }
 
 fn booleans(a bool_t, b bool_t) -> bool_t {
-    val c bool_t = false
-    ret c
+    ret a | b & b
 }
 
 -- fn branching () -> unit_t {

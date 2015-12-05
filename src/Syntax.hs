@@ -3,7 +3,10 @@ module Syntax where
 type Name = String
 type TypeName = String
 
-data Operation = Add | Sub | Mul | Div deriving (Eq, Ord, Show)
+data Operation 
+    = Add | Sub | Mul | Div -- basic arithmetic
+    | And | Or              -- boolean operations
+    deriving (Eq, Ord, Show)
 
 data FunctionArgument
     = FunArg Name TypeName deriving (Eq, Ord, Show)

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdbool.h>
 
 extern double add_sq(double a, double b);
 extern double sq(double a);
@@ -7,6 +8,7 @@ extern double inc(double a);
 extern double cos_sq(double a);
 extern double locals(void);
 extern void side_effects(double a);
+extern bool booleans(bool a, bool b);
 
 extern void print_float(double a) {
     printf("%f\n", a);
@@ -28,4 +30,8 @@ int main(int argc, char **argv) {
     puts("-- void: --");
     puts("calling side_effects(8)");
     side_effects(8);
+
+    puts("-- booleans: --");
+    printf("booleans(true, false) = %s\n", booleans(1, 0) ? "true" : "false");
+    printf("true || false && false = %s\n", (true || false && false) ? "true" : "false");
 }
