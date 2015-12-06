@@ -72,6 +72,18 @@ outFileExtensions = Map.fromList
     , (OutLLVMLanguage, ".ll")
     ]
 
+outFileFormats :: Map.Map OutputType E.OutModuleFormat
+outFileFormats = Map.fromList
+    [ (OutExecutable,     E.FormatObjectFile) 
+    , (OutObjectFile,     E.FormatObjectFile)
+    , (OutTargetAssembly, E.FormatTargetAssembly)
+    , (OutLLVMBitCode,    E.FormatLLVMBitCode)
+    , (OutLLVMLanguage,   E.FormatLLVMLanguage)
+    ]
+
+failOnNothing :: String -> Maybe a -> a
+failOnNothing message = Maybe.fromMaybe (error message)
+
 getFileType :: String -> Maybe FileType
 getFileType filename
     = Map.foldrWithKey f Nothing fileExtensions
@@ -94,12 +106,17 @@ filterPathsByType fileType
 
 getOutputExtension :: OutputType -> String
 getOutputExtension outType
-    = Maybe.fromMaybe failure $ Map.lookup outType outFileExtensions
+    = failOnNothing message $ Map.lookup outType outFileExtensions
         where
             typeString = show outType
             message = "Missing extension for " 
                         ++ typeString ++ " in extensions map."
-            failure = error message
+
+getFormat :: OutputType -> E.OutModuleFormat
+getFormat outType
+    = failOnNothing msg $ Map.lookup outType outFileFormats
+        where msg = "Fatal could not find output fromat for: " ++ show outType
+
 
 getNewPath :: String -> OutputType -> String
 getNewPath sourcePath outType
@@ -119,13 +136,19 @@ buildSource filePath options = do
         then do
             eitherAST <- M.liftM P.parseModule $ readFile filePath
             case eitherAST of
-                Right ast -> M.void $ E.generate moduleName outPath ast
+                Right ast -> do 
+                    M.when verbose $ putStrLn compileMessage
+                    M.void $ E.generate format moduleName outPath ast
                 Left err -> putStrLn $ "Parsing error: " ++ show err
         else putStrLn $ "File: '" ++ filePath ++ "' could not be open. Skipping."
     where
+        verbose = compilerVerbose options
         outType = compilerOutputType options
+        format = getFormat outType
         outPath = getNewPath filePath outType
         moduleName = getModuleName '/' filePath
+
+        compileMessage = "Compiling: '" ++ filePath ++ "' -> '" ++ outPath ++ "'"
 
 linkAll :: [String] -> IO ()
 linkAll objectPaths
@@ -133,7 +156,7 @@ linkAll objectPaths
     -- ld test.val.o test.c.o /usr/lib/crt1.o -arch x86_64 -macosx_version_min 10.11 -o test -lSystem
 
 compile :: CompilerOptions -> [String] -> IO ()
-compile options files = do
-    M.forM_ files $ \file -> do
+compile options files =
+    M.forM_ files $ \file ->
         buildSource file options
 

@@ -176,16 +176,32 @@ emmitExpression (S.CallExpr fun args) = do
 liftError :: Except.ExceptT String IO a -> IO a
 liftError = Except.runExceptT M.>=> either fail return
 
-generate :: String -> String -> [S.Expression] -> IO LLVM.Module
-generate name outPath defs =
+
+data OutModuleFormat
+    = FormatObjectFile
+    | FormatTargetAssembly
+    | FormatLLVMBitCode
+    | FormatLLVMLanguage
+
+writeOutFile :: OutModuleFormat 
+             -> LLVM.Module.Module 
+             -> LLVM.Targ.TargetMachine
+             -> LLVM.Module.File 
+             -> IO ()
+writeOutFile format mod target file
+    = liftError $ case format of
+        FormatObjectFile -> LLVM.Module.writeObjectToFile target file mod
+        FormatTargetAssembly -> LLVM.Module.writeTargetAssemblyToFile target file mod
+        FormatLLVMBitCode ->  LLVM.Module.writeBitcodeToFile file mod
+        FormatLLVMLanguage -> LLVM.Module.writeLLVMAssemblyToFile file mod
+
+generate :: OutModuleFormat -> String -> String -> [S.Expression] -> IO LLVM.Module
+generate format name outPath defs =
     LLVM.Ctx.withContext $ \context ->
         liftError $ LLVM.Targ.withHostTargetMachine $ \target ->
             liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
-                llstr <- LLVM.Module.moduleLLVMAssembly m
-                putStrLn llstr
                 let outFile = LLVM.Module.File outPath
-                --liftError $ LLVM.Module.writeLLVMAssemblyToFile outFile m
-                liftError $ LLVM.Module.writeObjectToFile target outFile m
+                writeOutFile format m target outFile
                 return newAst
             where
                 mod = CG.emptyModule name

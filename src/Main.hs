@@ -65,7 +65,5 @@ main :: IO ()
 main = do
     args <- Env.getArgs
     let (options, files) = parseOptions args
-    print options
-    print files
     C.compile options files
 
