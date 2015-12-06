@@ -76,3 +76,7 @@ fn mutability () -> unit_t {
     print_float(a)
 }
 
+fn main () -> unit_t {
+    mutability()
+}
+

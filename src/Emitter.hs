@@ -7,6 +7,7 @@ import qualified LLVM.General.AST as LLVM
 import qualified LLVM.General.AST.Constant as LLVM.Const
 import qualified LLVM.General.AST.Float as LLVM.Float
 
+import qualified LLVM.General.Target as LLVM.Targ
 import qualified LLVM.General.Context as LLVM.Ctx
 import qualified LLVM.General.Module as LLVM.Module
 
@@ -172,19 +173,22 @@ emmitExpression (S.CallExpr fun args) = do
     let funSybmol = CG.extern CG.double $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
-generate :: String -> String -> [S.Expression] -> IO LLVM.Module
-generate name outPath defs = LLVM.Ctx.withContext $ \context ->
-  liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
-    llstr <- LLVM.Module.moduleLLVMAssembly m
-    putStrLn llstr
-    let outFile = LLVM.Module.File outPath
-    liftError $ LLVM.Module.writeLLVMAssemblyToFile outFile m
-    return newAst
-  where
-    liftError :: Except.ExceptT String IO a -> IO a
-    liftError = Except.runExceptT M.>=> either fail return
+liftError :: Except.ExceptT String IO a -> IO a
+liftError = Except.runExceptT M.>=> either fail return
 
-    mod = CG.emptyModule name
-    modn = mapM generateSingleDef defs
-    newAst = CG.buildModule mod modn
+generate :: String -> String -> [S.Expression] -> IO LLVM.Module
+generate name outPath defs =
+    LLVM.Ctx.withContext $ \context ->
+        liftError $ LLVM.Targ.withHostTargetMachine $ \target ->
+            liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
+                llstr <- LLVM.Module.moduleLLVMAssembly m
+                putStrLn llstr
+                let outFile = LLVM.Module.File outPath
+                --liftError $ LLVM.Module.writeLLVMAssemblyToFile outFile m
+                liftError $ LLVM.Module.writeObjectToFile target outFile m
+                return newAst
+            where
+                mod = CG.emptyModule name
+                modn = mapM generateSingleDef defs
+                newAst = CG.buildModule mod modn
 

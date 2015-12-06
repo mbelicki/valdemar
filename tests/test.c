@@ -19,7 +19,7 @@ extern void print_float(double a) {
     printf("%f\n", a);
 }
 
-int main(int argc, char **argv) {
+int test_main(int argc, char **argv) {
     puts("-- basics: --");
     printf("add_sq(1, 2) = %f\n", add_sq(1, 2));
     printf("sq(2) = %f\n", sq(2));
