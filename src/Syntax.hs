@@ -10,12 +10,14 @@ data Operation
     | Eq | Neq | Lt | Lte | Gt | Gte -- comparison
     deriving (Eq, Ord, Show)
 
+data ValueKind = Immutable | Mutable deriving (Eq, Ord, Show)
+
 data FunctionArgument
     = FunArg Name TypeName deriving (Eq, Ord, Show)
 data FunctionDeclaration
     = FunDecl Name [FunctionArgument] TypeName deriving (Eq, Ord, Show)
 data ValueDeclaration
-    = ValDecl Name TypeName Expression deriving (Eq, Ord, Show)
+    = ValDecl ValueKind Name TypeName Expression deriving (Eq, Ord, Show)
 
 data Expression
     = BooleanExpr Bool
@@ -35,4 +37,5 @@ data Statement
     | ExpressionStmt Expression
     | BlockStmt [Statement]
     | IfStmt Expression Statement
+    | AssignmentStmt Name Expression
     deriving (Eq, Ord, Show)

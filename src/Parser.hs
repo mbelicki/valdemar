@@ -64,14 +64,18 @@ funArg = do
     typeName <- identifier
     return $ FunArg name typeName
 
+valueDeclKind :: Parser ValueKind
+valueDeclKind = (reserved "val" >> return Immutable)
+            <|> (reserved "mutval" >> return Mutable)
+
 valueDecl :: Parser ValueDeclaration
 valueDecl = do
-    reserved "val"
+    kind <- valueDeclKind
     name <- identifier
     typeName <- identifier
     reserved "="
     body <- expr
-    return $ ValDecl name typeName body
+    return $ ValDecl kind name typeName body
 
 value :: Parser Expression
 value = M.liftM ValDeclExpr valueDecl
@@ -138,10 +142,18 @@ ifStmt = do
     body <- statement
     return $ IfStmt cond body
 
+assignmentStmt :: Parser Statement
+assignmentStmt = do
+    name <- identifier
+    reserved "="
+    body <- expr
+    return $ AssignmentStmt name body
+
 statement :: Parser Statement
 statement = try returnStmt
         <|> try blockStmt
         <|> try ifStmt
+        <|> try assignmentStmt
         <|> try expressionStmt
 
 contents :: Parser a -> Parser a

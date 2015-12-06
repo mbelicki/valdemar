@@ -96,7 +96,7 @@ generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType))
 emmitStatement :: S.Statement -> CG.CodeGenerator ()
 emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
 emmitStatement (S.ReturnStmt n) = M.void $ emmitExpression n >>= CG.ret
-emmitStatement (S.BlockStmt n) = M.forM_ n $ \s -> emmitStatement s
+emmitStatement (S.BlockStmt n) = M.forM_ n emmitStatement
 emmitStatement (S.IfStmt cond body) = do
     thenBlock <- CG.addBlock "if.then"
     endBlock  <- CG.addBlock "if.end"
@@ -112,6 +112,13 @@ emmitStatement (S.IfStmt cond body) = do
     
     CG.setBlock endBlock
     return ()
+
+emmitStatement (S.AssignmentStmt name n) = do
+    op <- emmitExpression n
+    var <- CG.getLocal name
+    CG.store var op
+    return ()
+    
 
 binaryOperators = Map.fromList 
     [ (S.Add, CG.fadd)
@@ -137,10 +144,9 @@ emmitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Flo
 emmitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
 emmitExpression (S.BooleanExpr n) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
 emmitExpression (S.VarExpr n) = CG.getLocal n >>= CG.load
-emmitExpression (S.ValDeclExpr (S.ValDecl name typeName n)) = do
+emmitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n)) = do
     op <- emmitExpression n
     let Just llvmType = getLLVMType typeName
-        llvmName = LLVM.Name name
     var <- CG.alloca llvmType 
     CG.store var op
     CG.assignLocal name var
