@@ -16,5 +16,5 @@ executable valdemar
   hs-source-dirs:      src
   main-is:             Main.hs
   default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5, parsec >= 3.1.9, llvm-general >= 3.5, llvm-general-pure >= 3.5, containers >= 0.5, mtl >= 2.0, directory >= 1.0
+  build-depends:       base >= 4.7 && < 5, parsec >= 3.1.9, llvm-general >= 3.5, llvm-general-pure >= 3.5, containers >= 0.5, mtl >= 2.0, directory >= 1.0, process >= 1.2
 

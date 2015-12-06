@@ -31,6 +31,7 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 
 import qualified System.Directory as Dir
+import qualified System.Process as Proc
 
 data OutputType = OutExecutable
                 | OutObjectFile
@@ -143,20 +144,38 @@ buildSource filePath options = do
         else putStrLn $ "File: '" ++ filePath ++ "' could not be open. Skipping."
     where
         verbose = compilerVerbose options
-        outType = compilerOutputType options
+        -- get output type from options, if building executable compile each
+        -- source to object file
+        outType = case compilerOutputType options of
+                    OutExecutable -> OutObjectFile
+                    other -> other
         format = getFormat outType
         outPath = getNewPath filePath outType
         moduleName = getModuleName '/' filePath
 
         compileMessage = "Compiling: '" ++ filePath ++ "' -> '" ++ outPath ++ "'"
 
-linkAll :: [String] -> IO ()
-linkAll objectPaths
-    = undefined
-    -- ld test.val.o test.c.o /usr/lib/crt1.o -arch x86_64 -macosx_version_min 10.11 -o test -lSystem
+linkAll :: String -> [String] -> IO ()
+linkAll outName objectPaths
+    = Proc.callProcess "ld" args
+        where 
+            args = objectPaths ++ osxArgs ++ output
+            osxArgs = [ "/usr/lib/crt1.o", "-arch", "x86_64"
+                      , "-macosx_version_min", "10.11", "-lSystem"
+                      ]
+            output = ["-o", outName]
 
 compile :: CompilerOptions -> [String] -> IO ()
-compile options files =
-    M.forM_ files $ \file ->
+compile options files = do
+    let outputType = compilerOutputType options
+    let sources = filterPathsByType ValdemarSource files
+    let objects = filterPathsByType ObjectFile files
+
+    M.forM_ sources $ \file ->
         buildSource file options
+
+    M.when (outputType == OutExecutable) $ do
+        let allObjects = objects ++ map (++ ".o") sources
+        let outName = compilerOutputName options
+        linkAll outName allObjects
 
