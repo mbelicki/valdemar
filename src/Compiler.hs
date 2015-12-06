@@ -1,7 +1,20 @@
 module Compiler
+    -- high level compilation procedure
     ( compile
-    , OutputType
+    -- compier optput structure
     , CompilerOptions
+    , compilerOutputType
+    , compilerVerbose
+    , compilerOutputName
+    -- output types used in options
+    , OutputType
+        ( OutExecutable
+        , OutObjectFile
+        , OutTargetAssembly
+        , OutLLVMBitCode
+        , OutLLVMLanguage
+        )
+    -- defaut options
     , defaultOptions
     ) where
 
@@ -32,13 +45,15 @@ data FileType = ValdemarSource
               deriving (Eq, Ord, Show)
 
 data CompilerOptions = CompilerOptions 
-        { compilerOutput :: OutputType
+        { compilerOutputType :: OutputType
+        , compilerOutputName :: String
         , compilerVerbose :: Bool
-        }
+        } deriving (Eq, Ord, Show)
 
 defaultOptions :: CompilerOptions
 defaultOptions = CompilerOptions 
-        { compilerOutput = OutObjectFile
+        { compilerOutputType = OutExecutable
+        , compilerOutputName = "a.out"
         , compilerVerbose = False
         }
 
@@ -108,7 +123,7 @@ buildSource filePath options = do
                 Left err -> putStrLn $ "Parsing error: " ++ show err
         else putStrLn $ "File: '" ++ filePath ++ "' could not be open. Skipping."
     where
-        outType = compilerOutput options
+        outType = compilerOutputType options
         outPath = getNewPath filePath outType
         moduleName = getModuleName '/' filePath
 
