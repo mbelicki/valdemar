@@ -151,7 +151,7 @@ emmitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n)) = do
     var <- CG.alloca llvmType 
     CG.store var op
     CG.assignLocal name var
-    return var
+    return op
 
 emmitExpression (S.PrefixOpExpr op a)
     = case Map.lookup op unaryOperators of

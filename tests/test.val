@@ -52,13 +52,6 @@ fn count_down(a double_t) -> unit_t {
     }
 }
 
--- fn arrays () -> unit_t {
---     val arr [double_t] = [1.0, 2.1, 3.2]
---     val item double_t = [arr 0]
---     val item double_t = arr[0]
---     val item double_t = arr at 0
--- }
-
 fn vald_fabs(a double_t) -> double_t {
     if a < 0.0 ret a * -1.0
     ret a
@@ -76,7 +69,12 @@ fn mutability () -> unit_t {
     print_float(a)
 }
 
+-- fn arrays () -> unit_t {
+--     val arr [double_t] = [1.0, 2.1, 3.2]
+--     val item double_t = arr[0]
+-- }
+
 fn main () -> unit_t {
-    mutability()
+    count_down(a)
 }
 
