@@ -19,7 +19,7 @@ endif
 
 syn case match
 
-syn keyword valdemarKeywords fn val ext_c ret if not
+syn keyword valdemarKeywords fn val mutval ext_c ret if else for while not
 syn match valdemarType "\w*_t"
 
 syn keyword valdemarCommentTodo TODO todo FIXME fixme TBD contained
