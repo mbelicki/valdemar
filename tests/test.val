@@ -69,6 +69,8 @@ fn mutability () -> unit_t {
     print_float(a)
 }
 
+fn get_int() -> int_t ret 4
+
 fn arrays () -> unit_t {
     val arr ^[double_t] = [1.0, 2.1, 3.2]
     val item double_t = arr[0]
@@ -79,5 +81,6 @@ fn arrays () -> unit_t {
 
 fn main () -> unit_t {
     arrays()
+    val a int_t = get_int()
 }
 

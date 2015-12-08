@@ -176,8 +176,8 @@ newUniqueName name names
 local :: LLVM.Type -> LLVM.Name -> LLVM.Operand
 local = LLVM.LocalReference
 
-extern :: LLVM.Type -> LLVM.Name -> LLVM.Operand
-extern t = LLVM.ConstantOperand . LLVM.Const.GlobalReference t
+global :: LLVM.Type -> LLVM.Name -> LLVM.Operand
+global t = LLVM.ConstantOperand . LLVM.Const.GlobalReference t
 
 assignLocal :: String -> LLVM.Operand -> CodeGenerator ()
 assignLocal name operand = do
@@ -201,7 +201,10 @@ instruction instr
             ref = LLVM.UnName name
 
         modifyBlock $ block { blockStack = stack ++ [ref LLVM.:= instr] }
-        return $ local double ref
+        -- TODO: the type here is ignored by Haskell bindings, but for sake of
+        --       future-proofness this should probably be replaced with actual
+        --       type
+        return $ local LLVM.VoidType ref
 
 terminator :: LLVM.Named LLVM.Terminator -> CodeGenerator (LLVM.Named LLVM.Terminator)
 terminator term
@@ -303,9 +306,4 @@ bitcast op ty = instruction $ LLVM.BitCast op ty []
 getElementPtr :: LLVM.Operand -> [LLVM.Operand] -> CodeGenerator LLVM.Operand
 getElementPtr baseAddres offsets
     = instruction $ LLVM.GetElementPtr False baseAddres offsets []
-
--- Types:
-
-double :: LLVM.Type
-double = LLVM.FloatingPointType 64 LLVM.IEEE
 

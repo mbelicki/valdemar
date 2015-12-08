@@ -33,17 +33,17 @@ failFromMaybe message maybeValue
         Just a -> Right a
         Nothing -> Left message
 
+arrayIndexType :: LLVM.Type
+arrayIndexType = LLVM.IntegerType 32 
+
 getLLVMType :: S.Type -> LLVM.Type
 getLLVMType (S.TypeFloating n) = LLVM.FloatingPointType (fromIntegral n) LLVM.IEEE
 getLLVMType (S.TypeInteger n) = LLVM.IntegerType (fromIntegral n)
 getLLVMType  S.TypeBoolean = LLVM.IntegerType 1
 getLLVMType  S.TypeUnit = LLVM.VoidType
 getLLVMType (S.TypeArray ty)
-    = LLVM.StructureType False [indexType, arrayType] 
-        where 
-            elementType = getLLVMType ty
-            indexType = LLVM.IntegerType 32
-            arrayType = LLVM.ArrayType 0 elementType
+    = LLVM.StructureType False 
+        [arrayIndexType, LLVM.ArrayType 0 $ getLLVMType ty] 
 
 getLLVMType (S.TypePointer ty)
     = LLVM.PointerType (getLLVMType ty) (LLVM.Addr.AddrSpace 0)
@@ -153,21 +153,25 @@ emitExpression (S.BinOpExpr op a b)
 
 emitExpression (S.CallExpr fun args) = do
     argSymbols <- M.mapM emitExpression args
-    let funSybmol = CG.extern CG.double $ LLVM.Name fun
+    -- TODO: this seems to be ingoreed, but for sake of future-proofness
+    --       VoidType below should be replaced with actual type value
+    --       returned by the function
+    let funSybmol = CG.global LLVM.VoidType $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
 emitExpression (S.ArrayExpr ns) = do
     consts <- M.forM ns $ \n -> emitConstant n
-    let arrayConst = LLVM.Const.Array CG.double consts
+    let arrayConst = LLVM.Const.Array llvmType consts
     let countConst = LLVM.Const.Int 32 (toInteger $ length ns)
     let structConst = LLVM.Const.Struct Nothing False [countConst, arrayConst]
     ptr <- CG.alloca structType
     CG.store ptr $ CG.const structConst
-    CG.bitcast ptr $ getLLVMType $ S.TypePointer (S.TypeArray $ S.TypeFloating 64)
+    CG.bitcast ptr $ getLLVMType $ S.TypePointer (S.TypeArray elementType)
   where
-    indexType = LLVM.IntegerType 32
-    arrayType = LLVM.ArrayType 3 CG.double
-    structType = LLVM.StructureType False [indexType, arrayType]
+    elementType = S.TypeFloating 64
+    llvmType = getLLVMType elementType
+    arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
+    structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
 emitExpression (S.ElementOfExpr name index) = do
     indexOp <- emitExpression index
@@ -177,8 +181,8 @@ emitExpression (S.ElementOfExpr name index) = do
     let dataOffset = CG.const $ LLVM.Const.Int 32 1
     ptrOp <- CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
     CG.load ptrOp
+ 
     
-
 emitConstant :: S.Expression -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n) = return $ LLVM.Const.Float (LLVM.Float.Double n)
 
