@@ -1,7 +1,6 @@
 module Syntax where
 
 type Name = String
-type TypeName = String
 
 data Operation 
     = Add | Sub | Mul | Div          -- basic arithmetic
@@ -12,19 +11,31 @@ data Operation
 
 data ValueKind = Immutable | Mutable deriving (Eq, Ord, Show)
 
+type BitCount = Int
+
+data Type = TypeFloating BitCount
+          | TypeInteger BitCount
+          | TypeBoolean
+          | TypeUnit
+          | TypeArray Type
+          | TypePointer Type
+          deriving (Eq, Ord, Show)
+
 data FunctionArgument
-    = FunArg Name TypeName deriving (Eq, Ord, Show)
+    = FunArg Name Type deriving (Eq, Ord, Show)
 data FunctionDeclaration
-    = FunDecl Name [FunctionArgument] TypeName deriving (Eq, Ord, Show)
+    = FunDecl Name [FunctionArgument] Type deriving (Eq, Ord, Show)
 data ValueDeclaration
-    = ValDecl ValueKind Name TypeName Expression deriving (Eq, Ord, Show)
+    = ValDecl ValueKind Name Type Expression deriving (Eq, Ord, Show)
 
 data Expression
     = BooleanExpr Bool
     | IntegerExpr Int
     | FloatExpr Double
+    | ArrayExpr [Expression]
     | PrefixOpExpr Operation Expression
     | BinOpExpr Operation Expression Expression
+    | ElementOfExpr Name Expression
     | VarExpr Name
     | ValDeclExpr ValueDeclaration
     | FunDeclExpr FunctionDeclaration Statement

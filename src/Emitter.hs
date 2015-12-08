@@ -6,6 +6,7 @@ import qualified CodeGenerator as CG
 import qualified LLVM.General.AST as LLVM
 import qualified LLVM.General.AST.Constant as LLVM.Const
 import qualified LLVM.General.AST.Float as LLVM.Float
+import qualified LLVM.General.AST.AddrSpace as LLVM.Addr
 
 import qualified LLVM.General.Target as LLVM.Targ
 import qualified LLVM.General.Context as LLVM.Ctx
@@ -32,45 +33,30 @@ failFromMaybe message maybeValue
         Just a -> Right a
         Nothing -> Left message
 
-builtInTypes :: Map.Map String LLVM.Type
-builtInTypes
-    = Map.fromList 
-        [ ("int_t",    CG.int)
-        , ("double_t", CG.double)
-        , ("bool_t",   CG.bool)
-        , ("unit_t",   CG.void)
-        ]
-
-getLLVMType :: S.TypeName -> Maybe LLVM.Type
-getLLVMType n = Map.lookup n builtInTypes
-
-transformArgument :: S.FunctionArgument -> Fallible CG.Argument
-transformArgument (S.FunArg name rawType)
-    = failFromMaybe message maybeArgument
+getLLVMType :: S.Type -> LLVM.Type
+getLLVMType (S.TypeFloating n) = LLVM.FloatingPointType (fromIntegral n) LLVM.IEEE
+getLLVMType (S.TypeInteger n) = LLVM.IntegerType (fromIntegral n)
+getLLVMType  S.TypeBoolean = LLVM.IntegerType 1
+getLLVMType  S.TypeUnit = LLVM.VoidType
+getLLVMType (S.TypeArray ty)
+    = LLVM.StructureType False [indexType, arrayType] 
         where 
-            message = "Unknown type: " ++ rawType
-            maybeType = Map.lookup rawType builtInTypes
-            maybeArgument = M.liftM (\a -> (a, LLVM.Name name, name)) maybeType
+            elementType = getLLVMType ty
+            indexType = LLVM.IntegerType 32
+            arrayType = LLVM.ArrayType 0 elementType
 
-transformFuncArgs :: [S.FunctionArgument] -> Fallible [CG.Argument]
+getLLVMType (S.TypePointer ty)
+    = LLVM.PointerType (getLLVMType ty) (LLVM.Addr.AddrSpace 0)
+            
+
+transformFuncArgs :: [S.FunctionArgument] -> [CG.Argument]
 transformFuncArgs
-    = foldr fold (Right [])
-        where
-            fold :: S.FunctionArgument -> Fallible [CG.Argument] -> Fallible [CG.Argument] 
-            fold rawArg otherArgs
-                = let pair = (transformArgument rawArg, otherArgs)
-                  in case pair of
-                    (Left m,    Right _) -> Left m
-                    (Left m1,   Left m2) -> Left (m1 ++ "\n" ++ m2)
-                    (Right _,   Left m) -> Left m
-                    (Right arg, Right args) -> Right (arg : args)
+    = map (\(S.FunArg name ty) -> (getLLVMType ty, LLVM.Name name, name))
 
 generateSingleDef :: S.Expression -> CG.ModuleBuilder ()
-generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body)
-    = case transformFuncArgs args of
-        Left _ -> return () -- return this error higher
-        Right funArgs -> do
-            let blocks = CG.createBlocks $ CG.executeGenerator $ do
+generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body) = do
+    let funArgs =  transformFuncArgs args
+    let blocks = CG.createBlocks $ CG.executeGenerator $ do
                     entry <- CG.addBlock CG.entryBlockName
                     CG.setBlock entry
                     -- allocate all variables on the stack
@@ -78,35 +64,33 @@ generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body)
                         var <- CG.alloca argType
                         CG.store var (CG.local argType argName)
                         CG.assignLocal rawName var
-                    -- emmit code for body
-                    emmitStatement body
+                    -- emit code for body
+                    emitStatement body
                     -- add ret void if returning unit_t
-                    M.when (retType == "unit_t") $ M.void CG.retVoid
+                    M.when (retType == S.TypeUnit) $ M.void CG.retVoid
                     --CG.ret
-            let Just llvmType = getLLVMType retType
-            CG.define llvmType name funArgs blocks
+    let llvmType = getLLVMType retType
+    CG.define llvmType name funArgs blocks
 
-generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType))
-    = case transformFuncArgs args of
-        Left _ -> return () -- return this error higher
-        Right funArgs -> do
-            let Just llvmType = getLLVMType retType
-            CG.external llvmType name funArgs
+generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType)) = do 
+    let funArgs = transformFuncArgs args
+    let llvmType = getLLVMType retType
+    CG.external llvmType name funArgs
     
 
-emmitStatement :: S.Statement -> CG.CodeGenerator ()
-emmitStatement (S.ExpressionStmt n) = M.void $ emmitExpression n
-emmitStatement (S.ReturnStmt n) = M.void $ emmitExpression n >>= CG.ret
-emmitStatement (S.BlockStmt n) = M.forM_ n emmitStatement
-emmitStatement (S.IfStmt cond body) = do
+emitStatement :: S.Statement -> CG.CodeGenerator ()
+emitStatement (S.ExpressionStmt n) = M.void $ emitExpression n
+emitStatement (S.ReturnStmt n) = M.void $ emitExpression n >>= CG.ret
+emitStatement (S.BlockStmt n) = M.forM_ n emitStatement
+emitStatement (S.IfStmt cond body) = do
     thenBlock <- CG.addBlock "if.then"
     endBlock  <- CG.addBlock "if.end"
 
-    condOp <- emmitExpression cond
+    condOp <- emitExpression cond
     CG.condBr condOp thenBlock endBlock
 
     CG.setBlock thenBlock
-    emmitStatement body
+    emitStatement body
     block <- CG.currentBlock
     M.when (CG.needsTerminator block) $ 
         M.void $ CG.br endBlock
@@ -114,8 +98,8 @@ emmitStatement (S.IfStmt cond body) = do
     CG.setBlock endBlock
     return ()
 
-emmitStatement (S.AssignmentStmt name n) = do
-    op <- emmitExpression n
+emitStatement (S.AssignmentStmt name n) = do
+    op <- emitExpression n
     var <- CG.getLocal name
     CG.store var op
     return ()
@@ -140,38 +124,63 @@ unaryOperators = Map.fromList
     [ (S.LogNot, CG.logNot)
     ]
 
-emmitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand
-emmitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
-emmitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
-emmitExpression (S.BooleanExpr n) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
-emmitExpression (S.VarExpr n) = CG.getLocal n >>= CG.load
-emmitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n)) = do
-    op <- emmitExpression n
-    let Just llvmType = getLLVMType typeName
-    var <- CG.alloca llvmType 
-    CG.store var op
-    CG.assignLocal name var
+emitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand
+emitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
+emitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
+emitExpression (S.BooleanExpr n) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
+emitExpression (S.VarExpr n) = CG.getLocal n >>= CG.load
+emitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n)) = do
+    op <- emitExpression n
+    ptr <- CG.alloca $ getLLVMType typeName
+    CG.store ptr op
+    CG.assignLocal name ptr
     return op
 
-emmitExpression (S.PrefixOpExpr op a)
+emitExpression (S.PrefixOpExpr op a)
     = case Map.lookup op unaryOperators of
         Nothing -> error "TODO: fail gracefully when operator is missing."
         Just instr -> do
-            opA <- emmitExpression a
+            opA <- emitExpression a
             instr opA
 
-emmitExpression (S.BinOpExpr op a b)
+emitExpression (S.BinOpExpr op a b)
     = case Map.lookup op binaryOperators of
         Nothing -> error "TODO: fail gracefully when operator is missing."
         Just instr -> do
-            opA <- emmitExpression a
-            opB <- emmitExpression b
+            opA <- emitExpression a
+            opB <- emitExpression b
             instr opA opB
 
-emmitExpression (S.CallExpr fun args) = do
-    argSymbols <- M.mapM emmitExpression args
+emitExpression (S.CallExpr fun args) = do
+    argSymbols <- M.mapM emitExpression args
     let funSybmol = CG.extern CG.double $ LLVM.Name fun
     CG.call funSybmol argSymbols
+
+emitExpression (S.ArrayExpr ns) = do
+    consts <- M.forM ns $ \n -> emitConstant n
+    let arrayConst = LLVM.Const.Array CG.double consts
+    let countConst = LLVM.Const.Int 32 (toInteger $ length ns)
+    let structConst = LLVM.Const.Struct Nothing False [countConst, arrayConst]
+    ptr <- CG.alloca structType
+    CG.store ptr $ CG.const structConst
+    CG.bitcast ptr $ getLLVMType $ S.TypePointer (S.TypeArray $ S.TypeFloating 64)
+  where
+    indexType = LLVM.IntegerType 32
+    arrayType = LLVM.ArrayType 3 CG.double
+    structType = LLVM.StructureType False [indexType, arrayType]
+
+emitExpression (S.ElementOfExpr name index) = do
+    indexOp <- emitExpression index
+    arrayOp <- CG.getLocal name >>= CG.load
+
+    let offset = CG.const $ LLVM.Const.Int 32 0
+    let dataOffset = CG.const $ LLVM.Const.Int 32 1
+    ptrOp <- CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
+    CG.load ptrOp
+    
+
+emitConstant :: S.Expression -> CG.CodeGenerator LLVM.Const.Constant
+emitConstant (S.FloatExpr n) = return $ LLVM.Const.Float (LLVM.Float.Double n)
 
 liftError :: Except.ExceptT String IO a -> IO a
 liftError = Except.runExceptT M.>=> either fail return

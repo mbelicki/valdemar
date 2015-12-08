@@ -36,6 +36,38 @@ table = [ [ prefix "not" LogNot ]
 int :: Parser Expression
 int = M.liftM (IntegerExpr . fromInteger) integer
 
+typeBoolean :: Parser Type
+typeBoolean = reserved "bool_t" >> return TypeBoolean
+
+typeUnit :: Parser Type
+typeUnit = reserved "unit_t" >> return TypeUnit
+
+typeFloating :: Parser Type
+typeFloating = do
+    reserved "double_t" -- TODO: support other types
+    return $ TypeFloating 64
+
+typeInteger :: Parser Type
+typeInteger = do
+    reserved "int_t" -- TODO: support other types
+    return $ TypeInteger 64
+
+typeArray :: Parser Type
+typeArray = M.liftM TypeArray $ brackets typeDecl
+
+typePointer :: Parser Type
+typePointer = do
+    reserved "^"
+    ty <- typeDecl
+    return $ TypePointer ty
+
+typeDecl :: Parser Type
+typeDecl = typeArray 
+       <|> typePointer
+       <|> typeInteger 
+       <|> typeFloating 
+       <|> typeBoolean 
+       <|> typeUnit
 
 sign :: Parser Double
 sign =  (char '-' >> return (-1.0))
@@ -55,13 +87,16 @@ boolValue = (reserved "true"  >> return True)
 boolean :: Parser Expression
 boolean = M.liftM BooleanExpr boolValue
 
+array :: Parser Expression
+array = M.liftM ArrayExpr $ brackets $ commaSep expr
+
 variable :: Parser Expression
 variable = M.liftM VarExpr identifier
 
 funArg :: Parser FunctionArgument
 funArg = do
     name <- identifier
-    typeName <- identifier
+    typeName <- typeDecl
     return $ FunArg name typeName
 
 valueDeclKind :: Parser ValueKind
@@ -72,7 +107,7 @@ valueDecl :: Parser ValueDeclaration
 valueDecl = do
     kind <- valueDeclKind
     name <- identifier
-    typeName <- identifier
+    typeName <- typeDecl
     reserved "="
     body <- expr
     return $ ValDecl kind name typeName body
@@ -85,7 +120,7 @@ functionDecl = do
     name <- identifier
     args <- parens $ commaSep funArg
     reserved "->"
-    retType <- identifier
+    retType <- typeDecl
     return $ FunDecl name args retType
 
 function :: Parser Expression
@@ -107,14 +142,22 @@ call = do
   args <- parens $ commaSep expr
   return $ CallExpr name args
 
+elementOf :: Parser Expression
+elementOf = do
+    array <- identifier
+    index <- brackets expr
+    return $ ElementOfExpr array index
+
 anyExpr :: Parser Expression
 anyExpr = try floating
       <|> try int
       <|> try boolean
+      <|> try array
       <|> try value
       <|> try function
       <|> try extFunction
       <|> try call
+      <|> try elementOf
       <|> variable
       <|> parens expr
 

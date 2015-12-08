@@ -9,9 +9,9 @@ lexer :: Token.TokenParser ()
 lexer = Token.makeTokenParser style
   where
     opeators = [ "+", "-", "*", "/", "&", "|"
-               , "==", "/=", "<", "<=", ">", ">="
+               , "==", "/=", "<", "<=", ">", ">=", "[", "]", "^"
                ]
-    keywords = ["val", "fn", "ext_c", "ret", "if", "not"]
+    keywords = ["val", "mutval", "fn", "ext_c", "ret", "if", "not"]
     style = emptyDef
              { Token.commentLine = "--"
              , Token.reservedOpNames = opeators
@@ -30,6 +30,9 @@ parens = Token.parens lexer
 
 braces :: Parser a -> Parser a
 braces = Token.braces lexer
+
+brackets :: Parser a -> Parser a
+brackets = Token.brackets lexer
 
 commaSep :: Parser a -> Parser [a]
 commaSep = Token.commaSep lexer

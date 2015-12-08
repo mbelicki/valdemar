@@ -297,17 +297,15 @@ store pointer value = instruction $ LLVM.Store False pointer value Nothing 0 []
 load :: LLVM.Operand -> CodeGenerator LLVM.Operand
 load pointer = instruction $ LLVM.Load False pointer Nothing 0 []
 
+bitcast :: LLVM.Operand -> LLVM.Type -> CodeGenerator LLVM.Operand
+bitcast op ty = instruction $ LLVM.BitCast op ty []
+
+getElementPtr :: LLVM.Operand -> [LLVM.Operand] -> CodeGenerator LLVM.Operand
+getElementPtr baseAddres offsets
+    = instruction $ LLVM.GetElementPtr False baseAddres offsets []
+
 -- Types:
 
 double :: LLVM.Type
 double = LLVM.FloatingPointType 64 LLVM.IEEE
-
-int :: LLVM.Type
-int = LLVM.IntegerType 64
-
-bool :: LLVM.Type
-bool = LLVM.IntegerType 1
-
-void :: LLVM.Type
-void = LLVM.VoidType
 
