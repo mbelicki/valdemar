@@ -153,7 +153,10 @@ emitExpression (S.ArrayExpr ns ty) = do
     CG.store ptr $ CG.const structConst
     CG.bitcast ptr $ getLLVMType $ S.TypePointer (S.TypeArray elementType)
   where
-    elementType = S.TypeFloating 64
+    getBaseArrayType :: S.Type -> S.Type
+    getBaseArrayType (S.TypePointer (S.TypeArray t)) =t
+
+    elementType = getBaseArrayType ty
     llvmType = getLLVMType elementType
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
@@ -170,6 +173,8 @@ emitExpression (S.ElementOfExpr name index ty) = do
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n)
+emitConstant (S.IntegerExpr n ty) = return $ LLVM.Const.Int 64 (toInteger n)
+emitConstant (S.BooleanExpr n ty) = return $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
 
 liftError :: Except.ExceptT String IO a -> IO a
 liftError = Except.runExceptT M.>=> either fail return

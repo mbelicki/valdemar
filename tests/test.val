@@ -77,6 +77,14 @@ fn arrays () -> unit_t {
     print_float(item)
     print_float(arr[1])
     print_float(arr[2])
+
+    val ints ^[int_t] = [1, 2, 3]
+    val iteger int_t = ints[0]
+
+    val bools ^[bool_t] = [true, false]
+    if bools[0] {
+        print_float(arr[2])
+    }
 }
 
 fn main () -> unit_t {
