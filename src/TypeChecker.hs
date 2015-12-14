@@ -86,7 +86,10 @@ checkTree ast = do
     -- find and set all globals
     modify $ \s -> s { checkerGlobalScope = findGlobals ast }
     -- for body of each function do the typing
-    undefined
+    M.forM ast transformExpression 
+
+transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
+transformExpression = undefined
 
 findGlobals :: [S.Expression a] -> Scope
 findGlobals = buildScope . map funcToDecl

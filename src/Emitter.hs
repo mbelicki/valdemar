@@ -18,21 +18,6 @@ import qualified Data.Map as Map
 import qualified Data.Word as Word
 import qualified Data.Int as Int
 
-type Fallible a = Either String a
-
-isSuccesful :: Fallible a -> Bool
-isSuccesful = not . isFailure
-
-isFailure :: Fallible a -> Bool
-isFailure (Left _)  = True
-isFailure (Right _) = False
-
-failFromMaybe :: String -> Maybe a -> Fallible a
-failFromMaybe message maybeValue
-    = case maybeValue of
-        Just a -> Right a
-        Nothing -> Left message
-
 arrayIndexType :: LLVM.Type
 arrayIndexType = LLVM.IntegerType 32 
 
@@ -54,7 +39,7 @@ transformFuncArgs
     = map (\(S.FunArg name ty) -> (getLLVMType ty, LLVM.Name name, name))
 
 generateSingleDef :: S.Expression S.Type -> CG.ModuleBuilder ()
-generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body) = do
+generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body ty) = do
     let funArgs =  transformFuncArgs args
     let blocks = CG.createBlocks $ CG.executeGenerator $ do
                     entry <- CG.addBlock CG.entryBlockName
@@ -72,7 +57,7 @@ generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body) = do
     let llvmType = getLLVMType retType
     CG.define llvmType name funArgs blocks
 
-generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType)) = do 
+generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType) ty) = do 
     let funArgs = transformFuncArgs args
     let llvmType = getLLVMType retType
     CG.external llvmType name funArgs
@@ -125,25 +110,25 @@ unaryOperators = Map.fromList
     ]
 
 emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
-emitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
-emitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
-emitExpression (S.BooleanExpr n) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
-emitExpression (S.VarExpr n) = CG.getLocal n >>= CG.load
-emitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n)) = do
+emitExpression (S.FloatExpr n ty) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
+emitExpression (S.IntegerExpr n ty) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
+emitExpression (S.BooleanExpr n ty) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
+emitExpression (S.VarExpr n ty) = CG.getLocal n >>= CG.load
+emitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n) ty) = do
     op <- emitExpression n
     ptr <- CG.alloca $ getLLVMType typeName
     CG.store ptr op
     CG.assignLocal name ptr
     return op
 
-emitExpression (S.PrefixOpExpr op a)
+emitExpression (S.PrefixOpExpr op a ty)
     = case Map.lookup op unaryOperators of
         Nothing -> error "TODO: fail gracefully when operator is missing."
         Just instr -> do
             opA <- emitExpression a
             instr opA
 
-emitExpression (S.BinOpExpr op a b)
+emitExpression (S.BinOpExpr op a b ty)
     = case Map.lookup op binaryOperators of
         Nothing -> error "TODO: fail gracefully when operator is missing."
         Just instr -> do
@@ -151,7 +136,7 @@ emitExpression (S.BinOpExpr op a b)
             opB <- emitExpression b
             instr opA opB
 
-emitExpression (S.CallExpr fun args) = do
+emitExpression (S.CallExpr fun args ty) = do
     argSymbols <- M.mapM emitExpression args
     -- TODO: this seems to be ingoreed, but for sake of future-proofness
     --       VoidType below should be replaced with actual type value
@@ -159,7 +144,7 @@ emitExpression (S.CallExpr fun args) = do
     let funSybmol = CG.global LLVM.VoidType $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
-emitExpression (S.ArrayExpr ns) = do
+emitExpression (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n
     let arrayConst = LLVM.Const.Array llvmType consts
     let countConst = LLVM.Const.Int 32 (toInteger $ length ns)
@@ -173,7 +158,7 @@ emitExpression (S.ArrayExpr ns) = do
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
-emitExpression (S.ElementOfExpr name index) = do
+emitExpression (S.ElementOfExpr name index ty) = do
     indexOp <- emitExpression index
     arrayOp <- CG.getLocal name >>= CG.load
 
@@ -184,7 +169,7 @@ emitExpression (S.ElementOfExpr name index) = do
  
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
-emitConstant (S.FloatExpr n) = return $ LLVM.Const.Float (LLVM.Float.Double n)
+emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n)
 
 liftError :: Except.ExceptT String IO a -> IO a
 liftError = Except.runExceptT M.>=> either fail return
