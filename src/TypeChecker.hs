@@ -10,6 +10,9 @@ import Control.Monad as M
 import Control.Monad.State
 import Control.Applicative
 
+import Data.Maybe as Maybe
+import Data.List as List
+
 -- udnderlying data types and state setup
 
 type Decl = (S.Name, S.Type)
@@ -38,12 +41,22 @@ emptyChecker = CheckerState emptyScope emptyScope
 executeChecker :: TypeChecker a -> a
 executeChecker tc = evalState (runTypeChecker tc) emptyChecker
 
--- scope modifications:
+-- scope operations:
 
 appendDecl :: Decl -> Scope -> Scope
 appendDecl d s = s { scopeDeclarations = decls } where decls = d : scopeDeclarations s
 
--- cheker state mutations:
+findDeclInScope :: Scope -> S.Name -> Maybe Decl
+findDeclInScope scope name
+    = if Maybe.isJust maybeDecl then maybeDecl else maybeParentDecl
+        where
+            maybeParent = scopeParent scope
+            decls = scopeDeclarations scope
+            maybeDecl = find (\(n, _) -> n == name) decls
+
+            maybeParentDecl = maybeParent >>= (`findDeclInScope` name)
+
+-- cheker state operations:
 
 getGlobals :: TypeChecker Scope
 getGlobals = gets checkerGlobalScope
@@ -75,6 +88,17 @@ popScope = do
         Just scope -> modify $ \s -> s { checkerLocalScope = scope }
     return maybeParent
 
+findDecl :: S.Name -> TypeChecker (Maybe Decl)
+findDecl name = do
+    localScope  <- getLocals
+    globalScope <- getGlobals
+    let maybeLocal  = findDeclInScope localScope  name
+        maybeGlobal = findDeclInScope globalScope name
+    return $ if Maybe.isJust maybeLocal then maybeLocal else maybeGlobal
+
+assertType :: S.Type -> S.Type -> String -> TypeChecker ()
+assertType tyA tyB message = when (tyA /= tyB) $ error message
+
 -- entry point:
 
 typeCheck :: [S.Expression ()] -> [S.Expression S.Type]
@@ -89,7 +113,91 @@ checkTree ast = do
     M.forM ast transformExpression 
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
-transformExpression = undefined
+-- trivially typable expresions:
+transformExpression (S.BooleanExpr v _) = return $ S.BooleanExpr v S.TypeBoolean
+transformExpression (S.IntegerExpr v _) = return $ S.IntegerExpr v $ S.TypeInteger 64
+transformExpression (S.FloatExpr   v _) = return $ S.FloatExpr v $ S.TypeFloating 64
+-- array literal:
+transformExpression (S.ArrayExpr rawItems _) = do
+    items <- M.forM rawItems transformExpression
+    let types     = map S.tagOfExpr items
+        arrayType = inferArrayType types
+    return $ S.ArrayExpr items arrayType
+  where
+    checkItemType :: S.Type -> Maybe S.Type -> Maybe S.Type
+    checkItemType ta (Just tb) = if ta == tb then Just ta else Nothing
+    checkItemType _ Nothing = Nothing
+
+    inferArrayType :: [S.Type] -> S.Type
+    inferArrayType types
+        = Maybe.fromMaybe
+            (error "Mismatched types in literal array declaration.") 
+            (foldr checkItemType (Maybe.listToMaybe types) types)
+
+-- operators:
+transformExpression (S.PrefixOpExpr op arg _) = do
+    typed <- transformExpression arg
+    return $ S.PrefixOpExpr op typed $ S.tagOfExpr typed
+
+transformExpression (S.BinOpExpr op argA argB _) = do
+    typedA <- transformExpression argA
+    typedB <- transformExpression argB
+    let opType = if S.tagOfExpr typedA == S.tagOfExpr typedB
+                 then S.tagOfExpr typedA
+                 else error "Mismatched types in operator expression."
+    return $ S.BinOpExpr op typedA typedB opType
+
+-- based on defined symbols:
+transformExpression (S.VarExpr name _) = do
+    let fail = error $ "Unknown variable: " ++ name
+    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
+    return $ S.VarExpr name $ snd decl
+
+transformExpression (S.CallExpr name args _) = do
+    let declFail = error $ "Unknown function: " ++ name
+        argTypeFail = error $ "Mismatched argument types in call of function: " ++ name
+
+    decl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
+    typedArgs <- M.forM args transformExpression
+    
+    let actualArgTypes   = map S.tagOfExpr typedArgs
+        expectedArgTypes = getArgTypes $ snd decl
+
+        typedExpr = S.CallExpr name typedArgs $ getReturnType $ snd decl
+
+    return $ if actualArgTypes == expectedArgTypes
+             then typedExpr
+             else argTypeFail
+    where
+        getReturnType :: S.Type -> S.Type
+        getReturnType (S.TypeFunction _ ret) = ret
+
+        getArgTypes :: S.Type -> [S.Type]
+        getArgTypes (S.TypeFunction args _) = args
+
+transformExpression (S.ElementOfExpr name index _) = do
+    typedIndex <- transformExpression index
+    let indexType = S.tagOfExpr typedIndex
+    -- check if index has correct type
+    assertType indexType (S.TypeInteger 64) "Invalid index type, expected integer"
+
+    let declFail = error $ "Unknown array: " ++ name
+    arrayDecl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
+    -- check if array declaration from current scope has correct type
+    M.unless (S.isArrayPointer $ snd arrayDecl) $ error $ name ++ " is not array pointer."
+
+    return $ S.ElementOfExpr name typedIndex (innerType $ snd arrayDecl)
+    where
+        innerType :: S.Type -> S.Type
+        innerType (S.TypeArray t) = t
+
+--transformExpression ValDeclExpr (ValueDeclaration tag) tag
+--transformExpression FunDeclExpr FunctionDeclaration (Statement tag) tag
+--transformExpression ExtFunDeclExpr FunctionDeclaration tag
+
+
+transformStatement :: S.Statement () -> TypeChecker (S.Statement S.Type)
+transformStatement = undefined
 
 findGlobals :: [S.Expression a] -> Scope
 findGlobals = buildScope . map funcToDecl

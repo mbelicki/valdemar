@@ -22,6 +22,18 @@ data Type = TypeFloating BitCount
           | TypeFunction [Type] Type
           deriving (Eq, Ord, Show)
 
+isArray :: Type -> Bool
+isArray (TypeArray _) = True
+isArray _ = False
+
+isPointer :: Type -> Bool
+isPointer (TypePointer _) = True
+isPointer _ = False
+
+isArrayPointer :: Type -> Bool
+isArrayPointer (TypePointer ty) = isArray ty
+isArrayPointer _ = False
+
 data FunctionArgument
     = FunArg Name Type deriving (Eq, Ord, Show)
 data FunctionDeclaration
@@ -40,9 +52,23 @@ data Expression tag
     | VarExpr Name tag
     | ValDeclExpr (ValueDeclaration tag) tag
     | FunDeclExpr FunctionDeclaration (Statement tag) tag
-    | ExtFunDeclExpr FunctionDeclaration  tag
+    | ExtFunDeclExpr FunctionDeclaration tag
     | CallExpr Name [Expression tag] tag
     deriving (Eq, Ord, Show)
+
+tagOfExpr :: Expression a -> a
+tagOfExpr (BooleanExpr _ tag) = tag
+tagOfExpr (IntegerExpr _ tag) = tag
+tagOfExpr (FloatExpr _ tag) = tag
+tagOfExpr (ArrayExpr _ tag) = tag
+tagOfExpr (PrefixOpExpr _ _ tag) = tag
+tagOfExpr (BinOpExpr _ _ _ tag) = tag
+tagOfExpr (ElementOfExpr _ _ tag) = tag
+tagOfExpr (VarExpr _ tag) = tag
+tagOfExpr (ValDeclExpr _ tag) = tag
+tagOfExpr (FunDeclExpr _ _ tag) = tag
+tagOfExpr (ExtFunDeclExpr _ tag) = tag
+tagOfExpr (CallExpr _ _ tag) = tag
 
 data Statement a
     = ReturnStmt (Expression a)
@@ -51,3 +77,4 @@ data Statement a
     | IfStmt (Expression a) (Statement a)
     | AssignmentStmt Name (Expression a)
     deriving (Eq, Ord, Show)
+
