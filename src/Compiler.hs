@@ -20,6 +20,7 @@ module Compiler
 
 import qualified Parser as P
 import qualified Emitter as E
+import qualified TypeChecker as T
 
 import qualified LLVM.General.Target as LLVM.Targ
 import qualified LLVM.General.Context as LLVM.Ctx
@@ -138,8 +139,9 @@ buildSource filePath options = do
             eitherAST <- M.liftM P.parseModule $ readFile filePath
             case eitherAST of
                 Right ast -> do 
+                    let checkedAst = T.typeCheck ast
                     M.when verbose $ putStrLn compileMessage
-                    M.void $ E.generate format moduleName outPath ast
+                    M.void $ E.generate format moduleName outPath checkedAst
                 Left err -> putStrLn $ "Parsing error: " ++ show err
         else putStrLn $ "File: '" ++ filePath ++ "' could not be open. Skipping."
     where

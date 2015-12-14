@@ -19,34 +19,35 @@ data Type = TypeFloating BitCount
           | TypeUnit
           | TypeArray Type
           | TypePointer Type
+          | TypeFunction [Type] Type
           deriving (Eq, Ord, Show)
 
 data FunctionArgument
     = FunArg Name Type deriving (Eq, Ord, Show)
 data FunctionDeclaration
     = FunDecl Name [FunctionArgument] Type deriving (Eq, Ord, Show)
-data ValueDeclaration
-    = ValDecl ValueKind Name Type Expression deriving (Eq, Ord, Show)
+data ValueDeclaration a
+    = ValDecl ValueKind Name Type (Expression a) deriving (Eq, Ord, Show)
 
-data Expression
-    = BooleanExpr Bool
-    | IntegerExpr Int
-    | FloatExpr Double
-    | ArrayExpr [Expression]
-    | PrefixOpExpr Operation Expression
-    | BinOpExpr Operation Expression Expression
-    | ElementOfExpr Name Expression
-    | VarExpr Name
-    | ValDeclExpr ValueDeclaration
-    | FunDeclExpr FunctionDeclaration Statement
-    | ExtFunDeclExpr FunctionDeclaration 
-    | CallExpr Name [Expression]
+data Expression tag
+    = BooleanExpr Bool tag
+    | IntegerExpr Int tag
+    | FloatExpr Double tag
+    | ArrayExpr [Expression tag] tag
+    | PrefixOpExpr Operation (Expression tag) tag
+    | BinOpExpr Operation (Expression tag) (Expression tag) tag
+    | ElementOfExpr Name (Expression tag) tag
+    | VarExpr Name tag
+    | ValDeclExpr (ValueDeclaration tag) tag
+    | FunDeclExpr FunctionDeclaration (Statement tag) tag
+    | ExtFunDeclExpr FunctionDeclaration  tag
+    | CallExpr Name [Expression tag] tag
     deriving (Eq, Ord, Show)
 
-data Statement
-    = ReturnStmt Expression
-    | ExpressionStmt Expression
-    | BlockStmt [Statement]
-    | IfStmt Expression Statement
-    | AssignmentStmt Name Expression
+data Statement a
+    = ReturnStmt (Expression a)
+    | ExpressionStmt (Expression a)
+    | BlockStmt [Statement a]
+    | IfStmt (Expression a) (Statement a)
+    | AssignmentStmt Name (Expression a)
     deriving (Eq, Ord, Show)

@@ -53,7 +53,7 @@ transformFuncArgs :: [S.FunctionArgument] -> [CG.Argument]
 transformFuncArgs
     = map (\(S.FunArg name ty) -> (getLLVMType ty, LLVM.Name name, name))
 
-generateSingleDef :: S.Expression -> CG.ModuleBuilder ()
+generateSingleDef :: S.Expression S.Type -> CG.ModuleBuilder ()
 generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body) = do
     let funArgs =  transformFuncArgs args
     let blocks = CG.createBlocks $ CG.executeGenerator $ do
@@ -78,7 +78,7 @@ generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType)) = do
     CG.external llvmType name funArgs
     
 
-emitStatement :: S.Statement -> CG.CodeGenerator ()
+emitStatement :: S.Statement S.Type -> CG.CodeGenerator ()
 emitStatement (S.ExpressionStmt n) = M.void $ emitExpression n
 emitStatement (S.ReturnStmt n) = M.void $ emitExpression n >>= CG.ret
 emitStatement (S.BlockStmt n) = M.forM_ n emitStatement
@@ -124,7 +124,7 @@ unaryOperators = Map.fromList
     [ (S.LogNot, CG.logNot)
     ]
 
-emitExpression :: S.Expression -> CG.CodeGenerator LLVM.Operand
+emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExpression (S.FloatExpr n) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
 emitExpression (S.IntegerExpr n) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
 emitExpression (S.BooleanExpr n) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
@@ -183,7 +183,7 @@ emitExpression (S.ElementOfExpr name index) = do
     CG.load ptrOp
  
     
-emitConstant :: S.Expression -> CG.CodeGenerator LLVM.Const.Constant
+emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n) = return $ LLVM.Const.Float (LLVM.Float.Double n)
 
 liftError :: Except.ExceptT String IO a -> IO a
@@ -208,7 +208,7 @@ writeOutFile format mod target file
         FormatLLVMBitCode ->  LLVM.Module.writeBitcodeToFile file mod
         FormatLLVMLanguage -> LLVM.Module.writeLLVMAssemblyToFile file mod
 
-generate :: OutModuleFormat -> String -> String -> [S.Expression] -> IO LLVM.Module
+generate :: OutModuleFormat -> String -> String -> [S.Expression S.Type] -> IO LLVM.Module
 generate format name outPath defs =
     LLVM.Ctx.withContext $ \context ->
         liftError $ LLVM.Targ.withHostTargetMachine $ \target ->
