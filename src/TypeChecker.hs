@@ -123,8 +123,9 @@ transformExpression (S.FloatExpr   v _) = return $ S.FloatExpr v $ S.TypeFloatin
 -- array literal:
 transformExpression (S.ArrayExpr rawItems _) = do
     items <- M.forM rawItems transformExpression
-    let types     = map S.tagOfExpr items
-        arrayType = inferArrayType types
+    let types         = map S.tagOfExpr items
+        arrayBaseType = inferArrayType types
+        arrayType     = S.TypePointer $ S.TypeArray arrayBaseType
     return $ S.ArrayExpr items arrayType
   where
     checkItemType :: S.Type -> Maybe S.Type -> Maybe S.Type
@@ -146,9 +147,13 @@ transformExpression (S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
     typedB <- transformExpression argB
     let opType = if S.tagOfExpr typedA == S.tagOfExpr typedB
-                 then S.tagOfExpr typedA
+                 then getOpType op (S.tagOfExpr typedA)
                  else error "Mismatched types in operator expression."
     return $ S.BinOpExpr op typedA typedB opType
+  where
+    getOpType :: S.Operation -> S.Type -> S.Type
+    getOpType op _ | op `elem` [S.Eq, S.Neq, S.Lt, S.Lte, S.Gt, S.Gte, S.LogNot] = S.TypeBoolean
+    getOpType _ argType = argType
 
 -- based on defined symbols:
 transformExpression (S.VarExpr name _) = do
@@ -192,13 +197,13 @@ transformExpression (S.ElementOfExpr name index _) = do
     return $ S.ElementOfExpr name typedIndex (innerType $ snd arrayDecl)
     where
         innerType :: S.Type -> S.Type
-        innerType (S.TypeArray t) = t
+        innerType (S.TypePointer (S.TypeArray t)) = t
 
 transformExpression (S.ValDeclExpr (S.ValDecl kind name ty rawValue) _) = do
     typedValue <- transformExpression rawValue
     
     let message = "In binding of " ++ name
-    assertType (S.tagOfExpr typedValue) ty message
+    assertType ty (S.tagOfExpr typedValue) message
 
     addLocalDecl (name, ty)
 
@@ -206,8 +211,19 @@ transformExpression (S.ValDeclExpr (S.ValDecl kind name ty rawValue) _) = do
 
 -- function declarations:
 transformExpression (S.FunDeclExpr funDecl stmt _) = do
+    pushScope
+    
+    declareArguments funDecl
     typedStmt <- transformStatement stmt
+    
+    popScope
+
     return $ S.FunDeclExpr funDecl typedStmt $ S.funDeclToType funDecl
+  where
+    declareArguments :: S.FunctionDeclaration -> TypeChecker ()
+    declareArguments (S.FunDecl _ args _)
+        = M.forM_ args $ \(S.FunArg name ty) -> addLocalDecl (name, ty)
+
 
 transformExpression (S.ExtFunDeclExpr funDecl _)
     = return $ S.ExtFunDeclExpr funDecl $ S.funDeclToType funDecl
