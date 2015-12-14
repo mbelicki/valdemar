@@ -97,7 +97,10 @@ findDecl name = do
     return $ if Maybe.isJust maybeLocal then maybeLocal else maybeGlobal
 
 assertType :: S.Type -> S.Type -> String -> TypeChecker ()
-assertType tyA tyB message = when (tyA /= tyB) $ error message
+assertType expected actual message
+    = when (expected /= actual) $ error $ message ++ explanation
+        where
+            explanation = " expected: " ++ show expected ++ " found: " ++ show actual
 
 -- entry point:
 
@@ -179,7 +182,7 @@ transformExpression (S.ElementOfExpr name index _) = do
     typedIndex <- transformExpression index
     let indexType = S.tagOfExpr typedIndex
     -- check if index has correct type
-    assertType indexType (S.TypeInteger 64) "Invalid index type, expected integer"
+    assertType indexType (S.TypeInteger 64) "Invalid index type"
 
     let declFail = error $ "Unknown array: " ++ name
     arrayDecl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
@@ -191,23 +194,60 @@ transformExpression (S.ElementOfExpr name index _) = do
         innerType :: S.Type -> S.Type
         innerType (S.TypeArray t) = t
 
---transformExpression ValDeclExpr (ValueDeclaration tag) tag
---transformExpression FunDeclExpr FunctionDeclaration (Statement tag) tag
---transformExpression ExtFunDeclExpr FunctionDeclaration tag
+transformExpression (S.ValDeclExpr (S.ValDecl kind name ty rawValue) _) = do
+    typedValue <- transformExpression rawValue
+    
+    let message = "In binding of " ++ name
+    assertType (S.tagOfExpr typedValue) ty message
 
+    addLocalDecl (name, ty)
+
+    return $ S.ValDeclExpr (S.ValDecl kind name ty typedValue) ty
+
+-- function declarations:
+transformExpression (S.FunDeclExpr funDecl stmt _) = do
+    typedStmt <- transformStatement stmt
+    return $ S.FunDeclExpr funDecl typedStmt $ S.funDeclToType funDecl
+
+transformExpression (S.ExtFunDeclExpr funDecl _)
+    = return $ S.ExtFunDeclExpr funDecl $ S.funDeclToType funDecl
 
 transformStatement :: S.Statement () -> TypeChecker (S.Statement S.Type)
-transformStatement = undefined
+transformStatement (S.ReturnStmt rawExpr) = do
+    typedExpr <- transformExpression rawExpr
+    return $ S.ReturnStmt typedExpr
+
+transformStatement (S.ExpressionStmt rawExpr) = do
+    typedExpr <- transformExpression rawExpr
+    return $ S.ExpressionStmt typedExpr
+    
+transformStatement (S.BlockStmt rawStmts) = do
+    typedStmts <- M.forM rawStmts transformStatement
+    return $ S.BlockStmt typedStmts
+
+transformStatement (S.IfStmt rawCondition rawBody) = do
+    typedCondition <- transformExpression rawCondition
+    assertType S.TypeBoolean (S.tagOfExpr typedCondition) "If condtition expression:"
+
+    typedBody <- transformStatement rawBody
+    return $ S.IfStmt typedCondition typedBody
+
+transformStatement (S.AssignmentStmt name rawExpr) = do
+    typedExpr <- transformExpression rawExpr
+    
+    let fail = error $ "Unknown variable: " ++ name
+    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
+    
+    assertType (snd decl) (S.tagOfExpr typedExpr) $ "Cannot assing to " ++ name
+
+    return $ S.AssignmentStmt name typedExpr
+    
 
 findGlobals :: [S.Expression a] -> Scope
 findGlobals = buildScope . map funcToDecl
     where
-        typeOfDecl :: S.FunctionDeclaration -> S.Type
-        typeOfDecl (S.FunDecl _ args retType)
-            = S.TypeFunction (map (\(S.FunArg _ ty) -> ty) args) retType
-
         getDecl :: S.FunctionDeclaration -> Decl
-        getDecl decl@(S.FunDecl name _ _) = (name, typeOfDecl decl)
+        getDecl decl@(S.FunDecl name _ _) = (name, S.funDeclToType decl)
 
         funcToDecl :: S.Expression a -> Decl
         funcToDecl (S.FunDeclExpr d _ _) = getDecl d

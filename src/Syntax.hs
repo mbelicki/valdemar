@@ -41,6 +41,10 @@ data FunctionDeclaration
 data ValueDeclaration a
     = ValDecl ValueKind Name Type (Expression a) deriving (Eq, Ord, Show)
 
+funDeclToType :: FunctionDeclaration -> Type
+funDeclToType (FunDecl _ args retType)
+    = TypeFunction (map (\(FunArg _ ty) -> ty) args) retType
+
 data Expression tag
     = BooleanExpr Bool tag
     | IntegerExpr Int tag
