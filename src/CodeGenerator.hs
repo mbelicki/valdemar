@@ -264,6 +264,16 @@ and a b = instruction $ LLVM.And a b []
 or :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 or a b = instruction $ LLVM.Or a b []
 
+intComparison :: LLVM.IntPred.IntegerPredicate
+              -> LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+intComparison pred a b = instruction $ LLVM.ICmp pred a b []
+
+ilt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+ilt = intComparison LLVM.IntPred.ULT
+
+trunc :: LLVM.Operand -> LLVM.Type -> CodeGenerator LLVM.Operand
+trunc a t = instruction $ LLVM.Trunc a t []
+
 -- -- Boolean logic
 logNot :: LLVM.Operand -> CodeGenerator LLVM.Operand
 logNot a = do 

@@ -63,6 +63,10 @@ generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType) ty) = do
     CG.external llvmType name funArgs
     
 
+generateCommonDecls :: CG.ModuleBuilder ()
+generateCommonDecls =
+    CG.external (getLLVMType S.TypeUnit) "bounds_check_failed" []
+
 emitStatement :: S.Statement S.Type -> CG.CodeGenerator ()
 emitStatement (S.ExpressionStmt n) = M.void $ emitExpression n
 emitStatement (S.ReturnStmt n) = M.void $ emitExpression n >>= CG.ret
@@ -165,8 +169,31 @@ emitExpression (S.ElementOfExpr name index ty) = do
     indexOp <- emitExpression index
     arrayOp <- CG.getLocal name >>= CG.load
 
-    let offset = CG.const $ LLVM.Const.Int 32 0
-    let dataOffset = CG.const $ LLVM.Const.Int 32 1
+    let offset      = CG.const $ LLVM.Const.Int 32 0
+        dataOffset  = CG.const $ LLVM.Const.Int 32 1
+        countOffset = CG.const $ LLVM.Const.Int 32 0
+
+    let emitBoudCheck = True
+
+    M.when emitBoudCheck $ do
+        failBlock <- CG.addBlock "bounds.fail"
+        succBlock  <- CG.addBlock "bounds.success"
+        
+        countLocOp <- CG.getElementPtr arrayOp [offset, countOffset]
+        countOp <- CG.load countLocOp
+
+        truncedIndexOp <- CG.trunc indexOp $ getLLVMType $ S.TypeInteger 32
+        
+        compResultOp <- CG.ilt truncedIndexOp countOp 
+        CG.condBr compResultOp succBlock failBlock
+
+        CG.setBlock failBlock
+        let funSybmol = CG.global LLVM.VoidType $ LLVM.Name "bounds_check_failed"
+        CG.call funSybmol []
+        CG.br succBlock
+
+        M.void $ CG.setBlock succBlock
+
     ptrOp <- CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
     CG.load ptrOp
  
@@ -208,6 +235,6 @@ generate format name outPath defs =
                 return newAst
             where
                 mod = CG.emptyModule name
-                modn = mapM generateSingleDef defs
+                modn = generateCommonDecls >> mapM generateSingleDef defs
                 newAst = CG.buildModule mod modn
 

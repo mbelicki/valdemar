@@ -87,8 +87,13 @@ fn arrays () -> unit_t {
     }
 }
 
+fn out_of_range () -> unit_t {
+    val values ^[double_t] = [1.0, 2.0, 3.0, 4.0, 5.0]
+    print_float(values[5])
+}
+
 fn main () -> unit_t {
+    --out_of_range()
     arrays()
-    val a int_t = get_int()
 }
 
