@@ -3,7 +3,7 @@ ext_c putchar (c byte_t) -> unit_t
 ext_c getchar () -> byte_t
 
 fn interpret (prog ^[byte_t]) -> unit_t {
-    mutval tape ^[byte_t] = stack_alloc:byte_t(1024)
+    mutval tape ^[byte_t] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     mutval tape_index int_t = 0
 
     mutval i int_t = 0

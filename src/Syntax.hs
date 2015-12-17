@@ -48,6 +48,7 @@ funDeclToType (FunDecl _ args retType)
 data Expression tag
     = BooleanExpr Bool tag
     | IntegerExpr Int tag
+    | CharacterExpr Char tag
     | FloatExpr Double tag
     | ArrayExpr [Expression tag] tag
     | PrefixOpExpr Operation (Expression tag) tag

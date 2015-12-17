@@ -92,12 +92,6 @@ fn out_of_range () -> unit_t {
     print_float(values[5])
 }
 
---fn strings () -> unit_t {
---    val the_best_letter byte_t = 'M'
---    val at_last str_t = "hello, world"
---    val the_same_as_above ^[byte_t] = "oh, hai"
---}
-
 fn count_down2 (a double_t) -> unit_t {
     while a > 0.0 {
         a = a - 1.0
@@ -105,7 +99,19 @@ fn count_down2 (a double_t) -> unit_t {
     }
 }
 
+ext_c print_char (c byte_t) -> unit_t
+
+fn strings () -> unit_t {
+    val the_best_letter byte_t = 'M'
+    print_char(the_best_letter)
+    print_char('\n')
+
+    --val at_last str_t = "hello, world"
+    --val the_same_as_above ^[byte_t] = "oh, hai"
+}
+
+
 fn main () -> unit_t {
-    count_down2(10.0)
+    strings()
 }
 

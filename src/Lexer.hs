@@ -19,6 +19,9 @@ lexer = Token.makeTokenParser style
              , Token.caseSensitive = True
              }
 
+charLiteral :: Parser Char
+charLiteral = Token.charLiteral lexer
+
 integer :: Parser Integer
 integer = Token.integer lexer
 

@@ -117,9 +117,10 @@ checkTree ast = do
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
 -- trivially typable expresions:
-transformExpression (S.BooleanExpr v _) = return $ S.BooleanExpr v S.TypeBoolean
-transformExpression (S.IntegerExpr v _) = return $ S.IntegerExpr v $ S.TypeInteger 64
-transformExpression (S.FloatExpr   v _) = return $ S.FloatExpr v $ S.TypeFloating 64
+transformExpression (S.BooleanExpr   v _) = return $ S.BooleanExpr v S.TypeBoolean
+transformExpression (S.IntegerExpr   v _) = return $ S.IntegerExpr v $ S.TypeInteger 64
+transformExpression (S.CharacterExpr v _) = return $ S.IntegerExpr (fromEnum v) $ S.TypeInteger 8
+transformExpression (S.FloatExpr     v _) = return $ S.FloatExpr v $ S.TypeFloating 64
 -- array literal:
 transformExpression (S.ArrayExpr rawItems _) = do
     items <- M.forM rawItems transformExpression

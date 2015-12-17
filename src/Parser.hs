@@ -47,9 +47,8 @@ typeFloating = do
     return $ TypeFloating 64
 
 typeInteger :: Parser Type
-typeInteger = do
-    reserved "int_t" -- TODO: support other types
-    return $ TypeInteger 64
+typeInteger = (reserved "int_t" >> return (TypeInteger 64))
+          <|> (reserved "byte_t" >> return (TypeInteger 8))
 
 typeArray :: Parser Type
 typeArray = M.liftM TypeArray $ brackets typeDecl
@@ -92,6 +91,11 @@ boolean :: Parser (Expression ())
 boolean = do
     value <- boolValue
     return $ BooleanExpr value ()
+
+character :: Parser (Expression ())
+character = do
+    value <- charLiteral
+    return $ CharacterExpr value ()
 
 array :: Parser (Expression ())
 array = do
@@ -164,6 +168,7 @@ anyExpr :: Parser (Expression ())
 anyExpr = try floating
       <|> try int
       <|> try boolean
+      <|> try character
       <|> try array
       <|> try value
       <|> try function

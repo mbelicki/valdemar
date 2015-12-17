@@ -135,7 +135,8 @@ unaryOperators = Map.fromList
 
 emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExpression (S.FloatExpr n ty) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
-emitExpression (S.IntegerExpr n ty) = return $ CG.const $ LLVM.Const.Int 64 (toInteger n)
+emitExpression (S.IntegerExpr n (S.TypeInteger bits))
+    = return $ CG.const $ LLVM.Const.Int (fromIntegral bits) (toInteger n)
 emitExpression (S.BooleanExpr n ty) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
 emitExpression (S.VarExpr n ty) = CG.getLocal n >>= CG.load
 emitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n) ty) = do
