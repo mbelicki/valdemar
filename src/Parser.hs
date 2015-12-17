@@ -53,6 +53,9 @@ typeInteger = (reserved "int_t" >> return (TypeInteger 64))
 typeArray :: Parser Type
 typeArray = M.liftM TypeArray $ brackets typeDecl
 
+typeString :: Parser Type
+typeString = reserved "str_t" >> return (TypePointer $ TypeArray $ TypeInteger 8)
+
 typePointer :: Parser Type
 typePointer = do
     reserved "^"
@@ -62,6 +65,7 @@ typePointer = do
 typeDecl :: Parser Type
 typeDecl = typeArray 
        <|> typePointer
+       <|> typeString
        <|> typeInteger 
        <|> typeFloating 
        <|> typeBoolean 
@@ -96,6 +100,12 @@ character :: Parser (Expression ())
 character = do
     value <- charLiteral
     return $ CharacterExpr value ()
+
+stringValue :: Parser (Expression ())
+stringValue = do
+    value <- stringLiteral
+    let values = map (`CharacterExpr` ()) value
+    return $ ArrayExpr values ()
 
 array :: Parser (Expression ())
 array = do
@@ -169,6 +179,7 @@ anyExpr = try floating
       <|> try int
       <|> try boolean
       <|> try character
+      <|> try stringValue
       <|> try array
       <|> try value
       <|> try function

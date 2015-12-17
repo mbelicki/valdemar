@@ -134,10 +134,9 @@ unaryOperators = Map.fromList
     ]
 
 emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
-emitExpression (S.FloatExpr n ty) = return $ CG.const $ LLVM.Const.Float (LLVM.Float.Double n)
-emitExpression (S.IntegerExpr n (S.TypeInteger bits))
-    = return $ CG.const $ LLVM.Const.Int (fromIntegral bits) (toInteger n)
-emitExpression (S.BooleanExpr n ty) = return $ CG.const $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
+emitExpression e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
+emitExpression e@(S.IntegerExpr n ty) = M.liftM CG.const $ emitConstant e
+emitExpression e@(S.BooleanExpr n ty) = M.liftM CG.const $ emitConstant e
 emitExpression (S.VarExpr n ty) = CG.getLocal n >>= CG.load
 emitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n) ty) = do
     op <- emitExpression n
@@ -221,8 +220,9 @@ emitExpression (S.ElementOfExpr name index ty) = do
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n)
-emitConstant (S.IntegerExpr n ty) = return $ LLVM.Const.Int 64 (toInteger n)
 emitConstant (S.BooleanExpr n ty) = return $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
+emitConstant (S.IntegerExpr n (S.TypeInteger bits))
+    = return $ LLVM.Const.Int (fromIntegral bits) (toInteger n)
 
 liftError :: Except.ExceptT String IO a -> IO a
 liftError = Except.runExceptT M.>=> either fail return

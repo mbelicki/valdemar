@@ -28,6 +28,9 @@ integer = Token.integer lexer
 float :: Parser Double
 float = Token.float lexer
 
+stringLiteral :: Parser String
+stringLiteral = Token.stringLiteral lexer
+
 parens :: Parser a -> Parser a
 parens = Token.parens lexer
 

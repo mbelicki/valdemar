@@ -104,10 +104,12 @@ ext_c print_char (c byte_t) -> unit_t
 fn strings () -> unit_t {
     val the_best_letter byte_t = 'M'
     print_char(the_best_letter)
-    print_char('\n')
+    print_char(' ')
 
-    --val at_last str_t = "hello, world"
-    --val the_same_as_above ^[byte_t] = "oh, hai"
+    val at_last str_t = "hello, world"
+    val the_same_as_above ^[byte_t] = "oh, hai"
+
+    print_char(at_last[0])
 }
 
 
