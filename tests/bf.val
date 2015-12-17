@@ -1,0 +1,55 @@
+-- a simple brainfuck interpreter in valdemar
+ext_c putchar (c byte_t) -> unit_t
+ext_c getchar () -> byte_t
+
+fn interpret (prog ^[byte_t]) -> unit_t {
+    mutval tape ^[byte_t] = stack_alloc:byte_t(1024)
+    mutval tape_index int_t = 0
+
+    mutval i int_t = 0
+    mutval loop int_t = 0
+
+    while i < prog.lenght {
+        val c byte_t = prog[i]
+        if c == '>' {
+            tape_index = tape_index + 1
+        }
+        if c == '<' {
+            tape_index = tape_index - 1
+        }
+        if c == '+' {
+            tape[tape_index] = tape[tape_index] + 1
+        }
+        if c == '-' {
+            tape[tape_index] = tape[tape_index] - 1
+        }
+        if c == '.' {
+            putchar(tape[tape_index])
+        }
+        if c == ',' {
+            tape[tape_index] = getchar()
+        }
+        if c == '[' {
+            -- continue
+        }
+        if c == ']' {
+            loop = 1
+            while loop > 0 & tape[tape_index] > 0 {
+                i = i - 1
+                val cc byte_t = prog[i]
+                if cc == '[' {
+                    loop = loop - 1
+                }
+                if cc == ']' {
+                    loop = loop + 1
+                }
+            }
+        }
+
+        i = i + 1
+    }
+}
+
+fn main () -> unit_t {
+    interpret("++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.")
+}
