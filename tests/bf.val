@@ -18,10 +18,10 @@ fn interpret (prog ^[byte_t]) -> unit_t {
             tape_index = tape_index - 1
         }
         if c == '+' {
-            tape[tape_index] = tape[tape_index] + 1
+            tape[tape_index] = tape[tape_index] + '\1'
         }
         if c == '-' {
-            tape[tape_index] = tape[tape_index] - 1
+            tape[tape_index] = tape[tape_index] - '\1'
         }
         if c == '.' {
             print_char(tape[tape_index])
