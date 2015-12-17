@@ -18,6 +18,10 @@ extern void print_char(char c) {
     putchar(c);
 }
 
+extern char get_char() {
+    return getchar();
+}
+
 extern void bounds_check_failed(void) {
     fprintf(stderr, "Array out of bounds.");
     abort();

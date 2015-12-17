@@ -122,7 +122,13 @@ fn print (string str_t) -> unit_t {
     print_char('\n')
 }
 
+fn array_assignment () -> unit_t {
+    val hello str_t = "hello, world"
+    hello[0] = 'H'
+    print(hello)
+}
+
 fn main () -> unit_t {
-    print("hello, world")
+    array_assignment()
 }
 

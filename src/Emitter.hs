@@ -107,9 +107,15 @@ emitStatement (S.WhileStmt cond body) = do
     CG.setBlock endBlock
     return ()
 
-emitStatement (S.AssignmentStmt name n) = do
+emitStatement (S.AssignmentStmt (S.VarExpr name _) n) = do
     op <- emitExpression n
     var <- CG.getLocal name
+    CG.store var op
+    return ()
+
+emitStatement (S.AssignmentStmt e@(S.ElementOfExpr{}) n) = do
+    op <- emitExpression n
+    var <- getElementPtr e
     CG.store var op
     return ()
     
@@ -215,7 +221,10 @@ emitExpression (S.ArrayExpr ns ty) = do
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
-emitExpression (S.ElementOfExpr name index ty) = do
+emitExpression e@(S.ElementOfExpr{}) = getElementPtr e >>= CG.load
+ 
+getElementPtr :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
+getElementPtr (S.ElementOfExpr name index ty) = do
     indexOp <- emitExpression index
     arrayOp <- CG.getLocal name >>= CG.load
 
@@ -244,9 +253,7 @@ emitExpression (S.ElementOfExpr name index ty) = do
 
         M.void $ CG.setBlock succBlock
 
-    ptrOp <- CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
-    CG.load ptrOp
- 
+    CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n)

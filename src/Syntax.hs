@@ -82,6 +82,6 @@ data Statement a
     | BlockStmt [Statement a]
     | IfStmt (Expression a) (Statement a)
     | WhileStmt (Expression a) (Statement a)
-    | AssignmentStmt Name (Expression a)
+    | AssignmentStmt (Expression a) (Expression a)
     deriving (Eq, Ord, Show)
 

@@ -223,10 +223,10 @@ whileStmt = do
 
 assignmentStmt :: Parser (Statement ())
 assignmentStmt = do
-    name <- identifier
+    variable <- expr
     reserved "="
     body <- expr
-    return $ AssignmentStmt name body
+    return $ AssignmentStmt variable body
 
 statement :: Parser (Statement ())
 statement = try returnStmt

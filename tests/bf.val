@@ -1,15 +1,15 @@
 -- a simple brainfuck interpreter in valdemar
-ext_c putchar (c byte_t) -> unit_t
-ext_c getchar () -> byte_t
+ext_c print_char (c byte_t) -> unit_t
+ext_c get_char () -> byte_t
 
 fn interpret (prog ^[byte_t]) -> unit_t {
-    mutval tape ^[byte_t] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    mutval tape ^[byte_t] = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
     mutval tape_index int_t = 0
 
     mutval i int_t = 0
     mutval loop int_t = 0
 
-    while i < prog.lenght {
+    while i < #prog {
         val c byte_t = prog[i]
         if c == '>' {
             tape_index = tape_index + 1
@@ -24,17 +24,17 @@ fn interpret (prog ^[byte_t]) -> unit_t {
             tape[tape_index] = tape[tape_index] - 1
         }
         if c == '.' {
-            putchar(tape[tape_index])
+            print_char(tape[tape_index])
         }
         if c == ',' {
-            tape[tape_index] = getchar()
+            tape[tape_index] = get_char()
         }
         if c == '[' {
-            -- continue
+            -- do nothing, weeee
         }
         if c == ']' {
             loop = 1
-            while loop > 0 & tape[tape_index] > 0 {
+            while (loop > 0) & (tape[tape_index] > '\0') {
                 i = i - 1
                 val cc byte_t = prog[i]
                 if cc == '[' {

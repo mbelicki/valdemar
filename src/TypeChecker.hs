@@ -192,7 +192,7 @@ transformExpression (S.ElementOfExpr name index _) = do
     typedIndex <- transformExpression index
     let indexType = S.tagOfExpr typedIndex
     -- check if index has correct type
-    assertType indexType (S.TypeInteger 64) "Invalid index type"
+    assertType (S.TypeInteger 64) indexType "Invalid index type"
 
     let declFail = error $ "Unknown array: " ++ name
     arrayDecl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
@@ -260,7 +260,7 @@ transformStatement (S.WhileStmt rawCondition rawBody) = do
     typedBody <- transformStatement rawBody
     return $ S.WhileStmt typedCondition typedBody
 
-transformStatement (S.AssignmentStmt name rawExpr) = do
+transformStatement (S.AssignmentStmt (S.VarExpr name _) rawExpr) = do
     typedExpr <- transformExpression rawExpr
     
     let fail = error $ "Unknown variable: " ++ name
@@ -268,7 +268,23 @@ transformStatement (S.AssignmentStmt name rawExpr) = do
     
     assertType (snd decl) (S.tagOfExpr typedExpr) $ "Cannot assing to " ++ name
 
-    return $ S.AssignmentStmt name typedExpr
+    return $ S.AssignmentStmt (S.VarExpr name (snd decl)) typedExpr
+
+transformStatement (S.AssignmentStmt (S.ElementOfExpr name index _) rawExpr) = do
+    typedExpr <- transformExpression rawExpr
+    typedIndex <- transformExpression index
+    
+    let fail = error $ "Unknown variable: " ++ name
+    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
+    
+    assertType (getElemType $ snd decl) (S.tagOfExpr typedExpr) $ "Cannot assing to " ++ name
+    assertType (S.TypeInteger 64) (S.tagOfExpr typedIndex) "Invalid index type"
+
+    return $ S.AssignmentStmt (S.ElementOfExpr name typedIndex (snd decl)) typedExpr
+  where
+    getElemType :: S.Type -> S.Type
+    getElemType (S.TypePointer (S.TypeArray t)) = t
+    getElemType t = t
     
 
 findGlobals :: [S.Expression a] -> Scope
