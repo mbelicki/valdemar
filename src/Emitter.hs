@@ -87,6 +87,26 @@ emitStatement (S.IfStmt cond body) = do
     CG.setBlock endBlock
     return ()
 
+emitStatement (S.WhileStmt cond body) = do
+    beginBlock <- CG.addBlock "while.begin"
+    bodyBlock <- CG.addBlock "while.body"
+    endBlock  <- CG.addBlock "while.end"
+
+    CG.br beginBlock
+    CG.setBlock beginBlock
+
+    condOp <- emitExpression cond
+    CG.condBr condOp bodyBlock endBlock
+
+    CG.setBlock bodyBlock
+    emitStatement body
+    block <- CG.currentBlock
+    M.when (CG.needsTerminator block) $ 
+        M.void $ CG.br beginBlock
+    
+    CG.setBlock endBlock
+    return ()
+
 emitStatement (S.AssignmentStmt name n) = do
     op <- emitExpression n
     var <- CG.getLocal name

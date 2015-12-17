@@ -248,6 +248,13 @@ transformStatement (S.IfStmt rawCondition rawBody) = do
     typedBody <- transformStatement rawBody
     return $ S.IfStmt typedCondition typedBody
 
+transformStatement (S.WhileStmt rawCondition rawBody) = do
+    typedCondition <- transformExpression rawCondition
+    assertType S.TypeBoolean (S.tagOfExpr typedCondition) "While condtition expression:"
+
+    typedBody <- transformStatement rawBody
+    return $ S.WhileStmt typedCondition typedBody
+
 transformStatement (S.AssignmentStmt name rawExpr) = do
     typedExpr <- transformExpression rawExpr
     

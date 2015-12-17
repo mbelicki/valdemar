@@ -197,6 +197,13 @@ ifStmt = do
     body <- statement
     return $ IfStmt cond body
 
+whileStmt :: Parser (Statement ())
+whileStmt = do
+    reserved "while" 
+    cond <- expr
+    body <- statement
+    return $ WhileStmt cond body
+
 assignmentStmt :: Parser (Statement ())
 assignmentStmt = do
     name <- identifier
@@ -208,6 +215,7 @@ statement :: Parser (Statement ())
 statement = try returnStmt
         <|> try blockStmt
         <|> try ifStmt
+        <|> try whileStmt
         <|> try assignmentStmt
         <|> try expressionStmt
 
