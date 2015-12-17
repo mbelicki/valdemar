@@ -115,23 +115,41 @@ emitStatement (S.AssignmentStmt name n) = do
     
 
 binaryOperators = Map.fromList 
-    [ (S.Add, CG.fadd)
-    , (S.Sub, CG.fsub)
-    , (S.Mul, CG.fmul)
-    , (S.Div, CG.fdiv)
-    , (S.BitAnd, CG.and)
-    , (S.BitOr,  CG.or)
-    , (S.Eq,  CG.feq)
-    , (S.Neq, CG.fneq)
-    , (S.Lt,  CG.flt)
-    , (S.Gt,  CG.fgt)
-    , (S.Lte, CG.fle)
-    , (S.Gte, CG.fge)
+    [ ((S.Add,    False), CG.fadd)
+    , ((S.Sub,    False), CG.fsub)
+    , ((S.Mul,    False), CG.fmul)
+    , ((S.Div,    False), CG.fdiv)
+
+    , ((S.Eq,     False), CG.feq)
+    , ((S.Neq,    False), CG.fneq)
+    , ((S.Lt,     False), CG.flt)
+    , ((S.Gt,     False), CG.fgt)
+    , ((S.Lte,    False), CG.fle)
+    , ((S.Gte,    False), CG.fge)
+
+    , ((S.BitAnd, True),  CG.and)
+    , ((S.BitOr,  True),  CG.or)
+
+    , ((S.Add,    True),  CG.iadd)
+
+    , ((S.Lt,     True),  CG.ilt)
+    , ((S.Gt,     True),  CG.igt)
     ]
 
 unaryOperators = Map.fromList 
     [ (S.LogNot, CG.logNot)
+    , (S.ArrayLen, getArrayLenght)
     ]
+
+getArrayLenght :: LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+getArrayLenght arrayOp = do
+    let offset      = CG.const $ LLVM.Const.Int 32 0
+        countOffset = CG.const $ LLVM.Const.Int 32 0
+
+    countLocOp <- CG.getElementPtr arrayOp [offset, countOffset]
+    countOp <- CG.load countLocOp
+
+    CG.zext countOp $ getLLVMType $ S.TypeInteger 64
 
 emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExpression e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
@@ -153,12 +171,17 @@ emitExpression (S.PrefixOpExpr op a ty)
             instr opA
 
 emitExpression (S.BinOpExpr op a b ty)
-    = case Map.lookup op binaryOperators of
-        Nothing -> error "TODO: fail gracefully when operator is missing."
+    = case Map.lookup (op, isInt (S.tagOfExpr a)) binaryOperators of
+        Nothing -> error $ "Operator is missing: " ++ (show op) ++ ", " ++ (show ty)
         Just instr -> do
             opA <- emitExpression a
             opB <- emitExpression b
             instr opA opB
+        where
+            isInt :: S.Type -> Bool
+            isInt (S.TypeInteger _) = True
+            isInt (S.TypeBoolean) = True
+            isInt _ = False
 
 emitExpression (S.CallExpr fun args ty) = do
     argSymbols <- M.mapM emitExpression args

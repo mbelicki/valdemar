@@ -7,6 +7,7 @@ data Operation
     | BitAnd | BitOr                 -- bitwise operations
     | LogNot                         -- logical not
     | Eq | Neq | Lt | Lte | Gt | Gte -- comparison
+    | ArrayLen                       -- array lenght
     deriving (Eq, Ord, Show)
 
 data ValueKind = Immutable | Mutable deriving (Eq, Ord, Show)

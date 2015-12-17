@@ -16,7 +16,8 @@ prefix symbol func
 binary symbol func
     = E.Infix (operator symbol >> return (\a b -> BinOpExpr func a b ()))
 
-table = [ [ prefix "not" LogNot ]
+table = [ [ prefix "#" ArrayLen ]
+        , [ prefix "not" LogNot ]
         , [ binary "*" Mul E.AssocLeft
           , binary "/" Div E.AssocLeft
           ]

@@ -142,7 +142,11 @@ transformExpression (S.ArrayExpr rawItems _) = do
 -- operators:
 transformExpression (S.PrefixOpExpr op arg _) = do
     typed <- transformExpression arg
-    return $ S.PrefixOpExpr op typed $ S.tagOfExpr typed
+    return $ S.PrefixOpExpr op typed $ getOpType op $ S.tagOfExpr typed
+  where
+    getOpType :: S.Operation -> S.Type -> S.Type
+    getOpType op _ | op `elem` [S.ArrayLen] = S.TypeInteger 64
+    getOpType _ argType = argType
 
 transformExpression (S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA

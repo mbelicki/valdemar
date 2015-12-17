@@ -112,8 +112,16 @@ fn strings () -> unit_t {
     print_char(at_last[0])
 }
 
+fn print (string str_t) -> unit_t {
+    mutval i int_t = 0
+    while i < #string {
+        print_char(string[i])
+        i = i + 1
+    }
+    print_char('\n')
+}
 
 fn main () -> unit_t {
-    strings()
+    print("hello, world")
 }
 
