@@ -100,6 +100,7 @@ fn count_down2 (a double_t) -> unit_t {
 }
 
 ext_c print_char (c byte_t) -> unit_t
+ext_c print_int (c int_t) -> unit_t
 
 fn strings () -> unit_t {
     val the_best_letter byte_t = 'M'

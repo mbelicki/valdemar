@@ -131,9 +131,16 @@ binaryOperators = Map.fromList
     , ((S.BitOr,  True),  CG.or)
 
     , ((S.Add,    True),  CG.iadd)
+    , ((S.Sub,    True),  CG.isub)
+    , ((S.Mul,    True),  CG.imul)
+    , ((S.Div,    True),  CG.idiv)
 
+    , ((S.Eq,     True),  CG.ieq)
+    , ((S.Neq,    True),  CG.ineq)
     , ((S.Lt,     True),  CG.ilt)
     , ((S.Gt,     True),  CG.igt)
+    , ((S.Lte,    True),  CG.ile)
+    , ((S.Gte,    True),  CG.ige)
     ]
 
 unaryOperators = Map.fromList 
@@ -172,7 +179,7 @@ emitExpression (S.PrefixOpExpr op a ty)
 
 emitExpression (S.BinOpExpr op a b ty)
     = case Map.lookup (op, isInt (S.tagOfExpr a)) binaryOperators of
-        Nothing -> error $ "Operator is missing: " ++ (show op) ++ ", " ++ (show ty)
+        Nothing -> error $ "Operator is missing: " ++ show op ++ ", " ++ show ty
         Just instr -> do
             opA <- emitExpression a
             opB <- emitExpression b

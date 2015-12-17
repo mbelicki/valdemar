@@ -267,15 +267,36 @@ or a b = instruction $ LLVM.Or a b []
 iadd :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 iadd a b = instruction $ LLVM.Add False False a b []
 
+isub :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+isub a b = instruction $ LLVM.Sub False False a b []
+
+imul :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+imul a b = instruction $ LLVM.Add False False a b []
+
+idiv :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+idiv a b = instruction $ LLVM.Sub False False a b []
+
 intComparison :: LLVM.IntPred.IntegerPredicate
               -> LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 intComparison pred a b = instruction $ LLVM.ICmp pred a b []
+
+ieq :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+ieq = intComparison LLVM.IntPred.EQ
+
+ineq :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+ineq = intComparison LLVM.IntPred.NE
 
 ilt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 ilt = intComparison LLVM.IntPred.ULT
 
 igt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 igt = intComparison LLVM.IntPred.UGT
+
+ile :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+ile = intComparison LLVM.IntPred.ULE
+
+ige :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
+ige = intComparison LLVM.IntPred.UGE
 
 trunc :: LLVM.Operand -> LLVM.Type -> CodeGenerator LLVM.Operand
 trunc a t = instruction $ LLVM.Trunc a t []
