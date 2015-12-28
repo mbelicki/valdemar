@@ -154,6 +154,18 @@ unaryOperators = Map.fromList
     , (S.ArrayLen, getArrayLenght)
     ]
 
+conversions = Map.fromList
+    [ ((S.TypeFloating 64, S.TypeInteger 64), CG.fptosi)
+    , ((S.TypeInteger 64, S.TypeFloating 64), CG.sitofp)
+    ]
+
+convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+convert innerType outerType op
+    = case Map.lookup (innerType, outerType) conversions of
+        Nothing -> error $ "Conversion is missing: " 
+            ++ show innerType ++ " to " ++ show outerType
+        Just instr -> instr (getLLVMType outerType) op
+
 getArrayLenght :: LLVM.Operand -> CG.CodeGenerator LLVM.Operand
 getArrayLenght arrayOp = do
     let offset      = CG.const $ LLVM.Const.Int 32 0
@@ -196,19 +208,23 @@ emitExpression (S.BinOpExpr op a b ty)
             isInt (S.TypeBoolean) = True
             isInt _ = False
 
+emitExpression (S.CastExpr ty n _) = do 
+    let innerType = S.tagOfExpr n
+    op <- emitExpression n
+    convert innerType ty op
+
+
 emitExpression (S.CallExpr fun args ty) = do
     argSymbols <- M.mapM emitExpression args
-    -- TODO: this seems to be ingoreed, but for sake of future-proofness
-    --       VoidType below should be replaced with actual type value
-    --       returned by the function
-    let funSybmol = CG.global LLVM.VoidType $ LLVM.Name fun
+    let retType = getLLVMType ty
+        funSybmol = CG.global retType $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
 emitExpression (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n
     let arrayConst = LLVM.Const.Array llvmType consts
-    let countConst = LLVM.Const.Int 32 (toInteger $ length ns)
-    let structConst = LLVM.Const.Struct Nothing False [countConst, arrayConst]
+        countConst = LLVM.Const.Int 32 (toInteger $ length ns)
+        structConst = LLVM.Const.Struct Nothing False [countConst, arrayConst]
     ptr <- CG.alloca structType
     CG.store ptr $ CG.const structConst
     CG.bitcast ptr $ getLLVMType $ S.TypePointer (S.TypeArray elementType)

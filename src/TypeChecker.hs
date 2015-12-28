@@ -121,6 +121,10 @@ transformExpression (S.BooleanExpr   v _) = return $ S.BooleanExpr v S.TypeBoole
 transformExpression (S.IntegerExpr   v _) = return $ S.IntegerExpr v $ S.TypeInteger 64
 transformExpression (S.CharacterExpr v _) = return $ S.IntegerExpr (fromEnum v) $ S.TypeInteger 8
 transformExpression (S.FloatExpr     v _) = return $ S.FloatExpr v $ S.TypeFloating 64
+transformExpression (S.CastExpr    t v _) = do 
+    typedExpr <- transformExpression v
+    return $ S.CastExpr t typedExpr t
+
 -- array literal:
 transformExpression (S.ArrayExpr rawItems _) = do
     items <- M.forM rawItems transformExpression

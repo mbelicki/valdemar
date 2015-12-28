@@ -163,6 +163,12 @@ extFunction = do
   decl <- functionDecl
   return $ ExtFunDeclExpr decl ()
 
+cast :: Parser (Expression ())
+cast = do
+  castType <- typeDecl
+  expr <- parens $ expr
+  return $ CastExpr castType expr ()
+
 call :: Parser (Expression ())
 call = do
   name <- identifier
@@ -185,6 +191,7 @@ anyExpr = try floating
       <|> try value
       <|> try function
       <|> try extFunction
+      <|> try cast
       <|> try call
       <|> try elementOf
       <|> variable

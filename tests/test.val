@@ -114,7 +114,7 @@ fn strings () -> unit_t {
 }
 
 fn print (string str_t) -> unit_t {
-    mutval i int_t = 0
+    val i int_t = 0
     while i < #string {
         print_char(string[i])
         i = i + 1
@@ -128,7 +128,12 @@ fn array_assignment () -> unit_t {
     print(hello)
 }
 
+fn type_conversions () -> unit_t {
+    val a double_t = double_t(1 + 2)
+    print_float(a)
+}
+
 fn main () -> unit_t {
-    array_assignment()
+    type_conversions()
 }
 

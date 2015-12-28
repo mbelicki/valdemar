@@ -60,6 +60,7 @@ data Expression tag
     | FunDeclExpr FunctionDeclaration (Statement tag) tag
     | ExtFunDeclExpr FunctionDeclaration tag
     | CallExpr Name [Expression tag] tag
+    | CastExpr Type (Expression tag) tag
     deriving (Eq, Ord, Show)
 
 tagOfExpr :: Expression a -> a
@@ -75,6 +76,7 @@ tagOfExpr (ValDeclExpr _ tag) = tag
 tagOfExpr (FunDeclExpr _ _ tag) = tag
 tagOfExpr (ExtFunDeclExpr _ tag) = tag
 tagOfExpr (CallExpr _ _ tag) = tag
+tagOfExpr (CastExpr _ _ tag) = tag
 
 data Statement a
     = ReturnStmt (Expression a)

@@ -323,6 +323,13 @@ ret name = terminator $ LLVM.Do $ LLVM.Ret (Just name) []
 retVoid :: CodeGenerator (LLVM.Named LLVM.Terminator)
 retVoid = terminator $ LLVM.Do $ LLVM.Ret Nothing []
 
+-- -- Conversions:
+fptosi :: LLVM.Type -> LLVM.Operand -> CodeGenerator LLVM.Operand
+fptosi t op = instruction $ LLVM.FPToSI op t []
+
+sitofp :: LLVM.Type -> LLVM.Operand -> CodeGenerator LLVM.Operand
+sitofp t op = instruction $ LLVM.SIToFP op t []
+
 -- -- Memory and calling
 call :: LLVM.Operand -> [LLVM.Operand] -> CodeGenerator LLVM.Operand
 call func args
