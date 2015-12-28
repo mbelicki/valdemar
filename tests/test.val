@@ -114,7 +114,7 @@ fn strings () -> unit_t {
 }
 
 fn print (string str_t) -> unit_t {
-    val i int_t = 0
+    mutval i int_t = 0
     while i < #string {
         print_char(string[i])
         i = i + 1
@@ -129,8 +129,14 @@ fn array_assignment () -> unit_t {
 }
 
 fn type_conversions () -> unit_t {
-    val a double_t = double_t(1 + 2)
-    print_float(a)
+    if double_t(1 + 2) == 3.0
+        print("int_t -> double_t works.")
+    if int_t(3.2 + 2.1) == 5
+        print("double_t -> int_t works.")
+    if int_t('M') == 77
+        print("byte_t -> int_t works.")
+    if byte_t(77) == 'M'
+        print("int_t -> byte_t works.")
 }
 
 fn main () -> unit_t {

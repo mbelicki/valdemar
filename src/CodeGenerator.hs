@@ -298,11 +298,11 @@ ile = intComparison LLVM.IntPred.ULE
 ige :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 ige = intComparison LLVM.IntPred.UGE
 
-trunc :: LLVM.Operand -> LLVM.Type -> CodeGenerator LLVM.Operand
-trunc a t = instruction $ LLVM.Trunc a t []
+trunc :: LLVM.Type -> LLVM.Operand -> CodeGenerator LLVM.Operand
+trunc t a = instruction $ LLVM.Trunc a t []
 
-zext :: LLVM.Operand -> LLVM.Type -> CodeGenerator LLVM.Operand
-zext a t = instruction $ LLVM.ZExt a t []
+zext :: LLVM.Type -> LLVM.Operand -> CodeGenerator LLVM.Operand
+zext t a = instruction $ LLVM.ZExt a t []
 
 -- -- Boolean logic
 logNot :: LLVM.Operand -> CodeGenerator LLVM.Operand

@@ -157,6 +157,8 @@ unaryOperators = Map.fromList
 conversions = Map.fromList
     [ ((S.TypeFloating 64, S.TypeInteger 64), CG.fptosi)
     , ((S.TypeInteger 64, S.TypeFloating 64), CG.sitofp)
+    , ((S.TypeInteger 8,  S.TypeInteger 64), CG.zext)
+    , ((S.TypeInteger 64, S.TypeInteger 8), CG.trunc)
     ]
 
 convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
@@ -174,7 +176,7 @@ getArrayLenght arrayOp = do
     countLocOp <- CG.getElementPtr arrayOp [offset, countOffset]
     countOp <- CG.load countLocOp
 
-    CG.zext countOp $ getLLVMType $ S.TypeInteger 64
+    CG.zext (getLLVMType $ S.TypeInteger 64) countOp
 
 emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExpression e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
@@ -257,7 +259,7 @@ getElementPtr (S.ElementOfExpr name index ty) = do
         countLocOp <- CG.getElementPtr arrayOp [offset, countOffset]
         countOp <- CG.load countLocOp
 
-        truncedIndexOp <- CG.trunc indexOp $ getLLVMType $ S.TypeInteger 32
+        truncedIndexOp <- CG.trunc (getLLVMType $ S.TypeInteger 32) indexOp
         
         compResultOp <- CG.ilt truncedIndexOp countOp 
         CG.condBr compResultOp succBlock failBlock
