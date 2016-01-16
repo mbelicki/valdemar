@@ -4,6 +4,8 @@ import Text.Parsec.String(Parser)
 import Text.Parsec.Language(emptyDef)
 
 import qualified Text.Parsec.Token as Token
+import qualified Text.Parsec.Combinator as Combinator
+import qualified Text.Parsec.Char as Char
 
 lexer :: Token.TokenParser ()
 lexer = Token.makeTokenParser style
@@ -11,7 +13,7 @@ lexer = Token.makeTokenParser style
     opeators = [ "+", "-", "*", "/", "&", "|"
                , "==", "/=", "<", "<=", ">", ">=", "[", "]", "^"
                ]
-    keywords = ["val", "mutval", "fn", "ext_c", "ret", "if", "not"]
+    keywords = ["val", "mutval", "fn", "ext_c", "ret", "if", "not", "tuple"]
     style = emptyDef
              { Token.commentLine = "--"
              , Token.reservedOpNames = opeators
@@ -40,8 +42,11 @@ braces = Token.braces lexer
 brackets :: Parser a -> Parser a
 brackets = Token.brackets lexer
 
+commaSepNoDangling :: Parser a -> Parser [a]
+commaSepNoDangling p = Combinator.sepBy p (Token.comma lexer)
+
 commaSep :: Parser a -> Parser [a]
-commaSep = Token.commaSep lexer
+commaSep p = Combinator.sepEndBy p (Token.comma lexer)
 
 identifier :: Parser String
 identifier = Token.identifier lexer

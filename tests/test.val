@@ -139,6 +139,50 @@ fn type_conversions () -> unit_t {
         print("int_t -> byte_t works.")
 }
 
+-- class number_t {
+--     (+) (number_t, number_t) -> number_t
+--     (-) (number_t, number_t) -> number_t
+--     (*) (number_t, number_t) -> number_t
+--     (/) (number_t, number_t) -> number_t
+-- }
+-- 
+-- class container_t {
+--     length (container_t) -> int_t
+-- }
+
+-- fn sq_num (n number_t) -> number_t {
+--     ret n * n
+-- }
+
+-- anonymous tuple: (double_t, double_t)
+-- named tuple:
+tuple complex_t { 
+    real double_t,
+    imag double_t,
+}
+
+tuple vec3_t {
+    x, y, z double_t
+}
+
+-- fn mutate(a ^complex_t) -> unit_t {
+--     a->imag = 1.0
+-- }
+
+-- fn structs () -> unit_t {
+--     val number complex_t = (0.0, 0.0)
+--     print_float(number.real)
+--     print_float(number.imag)
+-- }
+
+-- instance complex_t : number_t {
+--     fn (+) (a complex_t, b complex_t) -> complex_t {
+--         val real double_t = a.real + b.real
+--         val imag double_t = a.imag + b.imag
+--         ret complex_t{real, imag}
+--     }
+-- }
+
 fn main () -> unit_t {
     type_conversions()
 }

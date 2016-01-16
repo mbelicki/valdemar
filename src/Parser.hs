@@ -124,6 +124,18 @@ funArg = do
     typeName <- typeDecl
     return $ FunArg name typeName
 
+funArgPack :: Parser [FunctionArgument]
+funArgPack = do
+    names <- commaSepNoDangling identifier
+    typeName <- typeDecl
+    return $ map (`FunArg` typeName) names
+
+argList :: Parser [FunctionArgument]
+argList = do
+    let singleArg = M.liftM (: []) funArg
+    args <- commaSep (try singleArg <|> funArgPack)
+    return $ concat args
+
 valueDeclKind :: Parser ValueKind
 valueDeclKind = (reserved "val" >> return Immutable)
             <|> (reserved "mutval" >> return Mutable)
@@ -163,10 +175,17 @@ extFunction = do
   decl <- functionDecl
   return $ ExtFunDeclExpr decl ()
 
+namedTuple :: Parser (Expression ())
+namedTuple = do
+    reserved "tuple"
+    name <- identifier
+    fields <- braces argList --commaSep funArg
+    return $ NamedTupleDeclExpr name fields ()
+
 cast :: Parser (Expression ())
 cast = do
   castType <- typeDecl
-  expr <- parens $ expr
+  expr <- parens expr
   return $ CastExpr castType expr ()
 
 call :: Parser (Expression ())
@@ -251,7 +270,7 @@ contents p = do
   return r
 
 toplevel :: Parser [Expression ()]
-toplevel = many (function <|> extFunction)
+toplevel = many (function <|> extFunction <|> namedTuple)
 
 parseExpr :: String -> Either ParseError (Expression ())
 parseExpr = parse (contents expr) "<stdin>"

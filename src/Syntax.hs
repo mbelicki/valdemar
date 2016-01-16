@@ -59,6 +59,7 @@ data Expression tag
     | ValDeclExpr (ValueDeclaration tag) tag
     | FunDeclExpr FunctionDeclaration (Statement tag) tag
     | ExtFunDeclExpr FunctionDeclaration tag
+    | NamedTupleDeclExpr Name [FunctionArgument] tag
     | CallExpr Name [Expression tag] tag
     | CastExpr Type (Expression tag) tag
     deriving (Eq, Ord, Show)
