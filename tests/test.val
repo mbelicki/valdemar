@@ -159,20 +159,29 @@ fn zeros () -> (double_t, double_t, double_t) {
 }
 
 fn ones () -> vec3_t {
-    ret (1.0, 1.0, 1.0)
+    val one double_t = 1.0
+    ret (one, one, one)
+}
+
+fn vec3_add(a, b vec3_t) -> vec3_t {
+    val (x1, y1, z1 double_t) = a
+    val (x2, y2, z2 double_t) = b
+    ret (x1 + x2, y1 + y2, z1 + z2)
+}
+
+fn vec3_print(a vec3_t) -> unit_t {
+    val (x, y, z double_t) = a
+    print_float(x)
+    print_float(y)
+    print_float(z)
 }
 
 fn structs () -> unit_t {
     val position vec3_t = (0.0, 1.0, 2.0)
     val target vec3_t = zeros()
     val up vec3_t = ones()
-    val down (double_t, double_t, double_t) = ones()
 
-    val (a double_t, b double_t, c double_t) = up
-    val (x, y, z double_t) = position
-
-    print_float(b)
-    print_float(z)
+    vec3_print(vec3_add(position, up))
 }
 
 fn arg_packs (a, b, c double_t) -> double_t {

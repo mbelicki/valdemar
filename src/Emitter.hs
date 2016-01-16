@@ -244,13 +244,18 @@ emitExpression (S.CallExpr fun args ty) = do
     CG.call funSybmol argSymbols
 
 emitExpression (S.AnonTupleExpr ns ty) = do
-    consts <- M.forM ns $ \n -> emitConstant n
-    let structConst = LLVM.Const.Struct Nothing False consts
-        op = CG.const structConst
-    -- TODO: remove constatns and allow to put any expresion in tuple
-    -- ptr <- CG.alloca $ getLLVMType ty
-    -- CG.store ptr op
-    return op
+    ops <- M.forM ns $ \n -> emitExpression n
+    -- allocate temporary struct
+    ptr <- CG.alloca $ getLLVMType ty
+    -- index operands
+    let indexedOps = zip [0..] ops
+    -- allocate all variables on the stack
+    M.forM_ indexedOps $ \(i, op) -> do
+        let offset       = CG.const $ LLVM.Const.Int 32 0
+            memberOffset = CG.const $ LLVM.Const.Int 32 i
+        memberPtr <- CG.getElementPtr ptr [offset, memberOffset]
+        CG.store memberPtr op
+    CG.load ptr
 
 emitExpression (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n

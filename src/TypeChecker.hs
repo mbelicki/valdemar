@@ -252,19 +252,20 @@ transformExpression (S.VarExpr name _) = do
 
 transformExpression (S.CallExpr name args _) = do
     let declFail = error $ "Unknown function: " ++ name
-        argTypeFail = error $ "Mismatched argument types in call of function: " ++ name
+        argTypeFail exp act 
+            = error $ "Mismatched argument types in call of function: " 
+                        ++ name ++ " expected: " ++ show exp ++ " actual: " ++ show act
 
     decl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
     typedArgs <- M.forM args transformExpression
     
-    let actualArgTypes   = map S.tagOfExpr typedArgs
-        expectedArgTypes = getArgTypes $ snd decl
+    actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
+    expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
 
-        typedExpr = S.CallExpr name typedArgs $ getReturnType $ snd decl
-
+    let typedExpr = S.CallExpr name typedArgs $ getReturnType $ snd decl
     return $ if actualArgTypes == expectedArgTypes
              then typedExpr
-             else argTypeFail
+             else argTypeFail expectedArgTypes actualArgTypes
     where
         getReturnType :: S.Type -> S.Type
         getReturnType (S.TypeFunction _ ret) = ret
