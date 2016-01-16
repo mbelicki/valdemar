@@ -166,7 +166,21 @@ resolveType t@(S.TypeUnknow name) = do
             let Just (nm, ty) = maybeAlias
             return ty
 
+resolveType t@(S.TypeArray ty) = do
+    resTy <- resolveType ty
+    return $ S.TypeArray resTy
+
+resolveType t@(S.TypePointer ty) = do
+    resTy <- resolveType ty
+    return $ S.TypePointer resTy
+
+resolveType t@(S.TypeFunction args ret) = do
+    resArgs <- M.mapM resolveType args
+    resRet <- resolveType ret
+    return $ S.TypeFunction resArgs resRet
+
 resolveType a = return a
+
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
 -- trivially typable expresions:
@@ -271,9 +285,10 @@ transformExpression (S.ElementOfExpr name index _) = do
 transformExpression (S.ValDeclExpr (S.ValDecl kind name t rawValue) _) = do
     typedValue <- transformExpression rawValue
     ty <- resolveType t
+    otherTy <- resolveType $ S.tagOfExpr typedValue
     
     let message = "In binding of '" ++ name ++ "'"
-    assertType ty (S.tagOfExpr typedValue) message
+    assertType ty otherTy message
 
     addLocalDecl (name, ty)
 
@@ -288,11 +303,25 @@ transformExpression (S.FunDeclExpr funDecl stmt _) = do
     
     popScope
 
-    return $ S.FunDeclExpr funDecl typedStmt $ S.funDeclToType funDecl
+    ty <- resolveType $ S.funDeclToType funDecl
+    decl <- resolveFunDecl funDecl
+
+    return $ S.FunDeclExpr decl typedStmt ty
   where
     declareArguments :: S.FunctionDeclaration -> TypeChecker ()
     declareArguments (S.FunDecl _ args _)
         = M.forM_ args $ \(S.FunArg name ty) -> addLocalDecl (name, ty)
+
+    resolveFunDecl :: S.FunctionDeclaration -> TypeChecker S.FunctionDeclaration
+    resolveFunDecl (S.FunDecl name args retTy) = do
+        resolvedArgs <- M.mapM resolveArg args
+        resolvedRetTy <- resolveType retTy
+        return $ S.FunDecl name resolvedArgs resolvedRetTy
+
+    resolveArg :: S.FunctionArgument -> TypeChecker S.FunctionArgument
+    resolveArg (S.FunArg nm ty) = do
+        resTy <- resolveType ty
+        return $ S.FunArg nm resTy
 
 
 transformExpression (S.ExtFunDeclExpr funDecl _)

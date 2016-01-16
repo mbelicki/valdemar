@@ -158,9 +158,15 @@ fn zeros () -> (double_t, double_t, double_t) {
     ret (0.0, 0.0, 0.0)
 }
 
+fn ones () -> vec3_t {
+    ret (1.0, 1.0, 1.0)
+}
+
 fn structs () -> unit_t {
     val position vec3_t = (0.0, 1.0, 2.0)
     val target vec3_t = zeros()
+    val up vec3_t = ones()
+    val down (double_t, double_t, double_t) = ones()
     --print_float(position.y)
 }
 
