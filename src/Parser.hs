@@ -157,7 +157,7 @@ value = do
 functionDecl :: Parser FunctionDeclaration
 functionDecl = do
     name <- identifier
-    args <- parens $ commaSep funArg
+    args <- parens argList
     reserved "->"
     retType <- typeDecl
     return $ FunDecl name args retType
@@ -179,7 +179,7 @@ namedTuple :: Parser (Expression ())
 namedTuple = do
     reserved "tuple"
     name <- identifier
-    fields <- braces argList --commaSep funArg
+    fields <- braces argList
     return $ NamedTupleDeclExpr name fields ()
 
 cast :: Parser (Expression ())
