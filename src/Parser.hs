@@ -63,6 +63,9 @@ typePointer = do
     ty <- typeDecl
     return $ TypePointer ty
 
+typeAnonTuple :: Parser Type
+typeAnonTuple = M.liftM (TypeTuple "") $ parens $ commaSep typeDecl
+
 typeUnknow :: Parser Type
 typeUnknow = do
     name <- identifier
@@ -78,6 +81,7 @@ typeDecl = typeArray
        <|> typeFloating 
        <|> typeBoolean 
        <|> typeUnit
+       <|> typeAnonTuple
        <|> typeUnknow
 
 int :: Parser (Expression ())
