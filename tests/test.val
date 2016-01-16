@@ -156,24 +156,22 @@ fn type_conversions () -> unit_t {
 
 -- anonymous tuple: (double_t, double_t)
 -- named tuple:
---tuple complex_t { 
---    real double_t,
---    imag double_t,
---}
---
---tuple vec3_t {
---    x, y, z double_t
---}
+tuple complex_t { 
+    real double_t,
+    imag double_t,
+}
+
+tuple vec3_t {
+    x, y, z double_t
+}
 
 -- fn mutate(a ^complex_t) -> unit_t {
 --     a->imag = 1.0
 -- }
 
--- fn structs () -> unit_t {
---     val number complex_t = (0.0, 0.0)
---     print_float(number.real)
---     print_float(number.imag)
--- }
+fn structs () -> unit_t {
+    val position vec3_t = (0.0, 1.0, 2.0)
+}
 
 -- instance complex_t : number_t {
 --     fn (+) (a complex_t, b complex_t) -> complex_t {
@@ -183,11 +181,12 @@ fn type_conversions () -> unit_t {
 --     }
 -- }
 
-fn arg_packs(a, b, c double_t) -> double_t {
-    ret a + b * c   
+fn arg_packs (a, b, c double_t) -> double_t {
+    ret a + b * c
 }
 
 fn main () -> unit_t {
     print_float(arg_packs(1.0, 2.0, 3.0))
+    structs()
 }
 

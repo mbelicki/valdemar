@@ -16,10 +16,12 @@ import Data.List as List
 -- udnderlying data types and state setup
 
 type Decl = (S.Name, S.Type)
+type TypeAlias = (S.Name, S.Type)
 
 data Scope 
     = Scope 
         { scopeDeclarations :: [Decl] 
+        , scopeAliases :: [TypeAlias]
         , scopeParent :: Maybe Scope
         }
 
@@ -33,7 +35,7 @@ newtype TypeChecker a = TypeChecker { runTypeChecker :: State CheckerState a }
   deriving (Functor, Applicative, Monad, MonadState CheckerState)
 
 emptyScope :: Scope
-emptyScope = Scope [] Nothing
+emptyScope = Scope [] [] Nothing
 
 emptyChecker :: CheckerState
 emptyChecker = CheckerState emptyScope emptyScope
@@ -46,15 +48,24 @@ executeChecker tc = evalState (runTypeChecker tc) emptyChecker
 appendDecl :: Decl -> Scope -> Scope
 appendDecl d s = s { scopeDeclarations = decls } where decls = d : scopeDeclarations s
 
+appendAlias :: TypeAlias -> Scope -> Scope
+appendAlias a s = s { scopeAliases = aliases } where aliases = a : scopeAliases s
+
 findDeclInScope :: Scope -> S.Name -> Maybe Decl
-findDeclInScope scope name
+findDeclInScope = findInScope scopeDeclarations
+
+findAliasInScope :: Scope -> S.Name -> Maybe TypeAlias
+findAliasInScope = findInScope scopeAliases
+
+findInScope :: (Scope -> [(S.Name, a)]) -> Scope -> S.Name -> Maybe (S.Name, a)
+findInScope getter scope name
     = if Maybe.isJust maybeDecl then maybeDecl else maybeParentDecl
         where
             maybeParent = scopeParent scope
-            decls = scopeDeclarations scope
+            decls = getter scope
             maybeDecl = find (\(n, _) -> n == name) decls
 
-            maybeParentDecl = maybeParent >>= (`findDeclInScope` name)
+            maybeParentDecl = maybeParent >>= (\s -> findInScope getter s name)
 
 -- cheker state operations:
 
@@ -97,6 +108,8 @@ findDecl name = do
     return $ if Maybe.isJust maybeLocal then maybeLocal else maybeGlobal
 
 assertType :: S.Type -> S.Type -> String -> TypeChecker ()
+assertType (S.TypeTuple _ exp_tys) (S.TypeTuple _ act_tys) message
+    = when (exp_tys /= act_tys) $ error message
 assertType expected actual message
     = when (expected /= actual) $ error $ message ++ explanation
         where
@@ -114,6 +127,46 @@ checkTree ast = do
     modify $ \s -> s { checkerGlobalScope = findGlobals ast }
     -- for body of each function do the typing
     M.forM ast transformExpression 
+
+findGlobals :: [S.Expression a] -> Scope
+findGlobals s = buildScope decls aliases
+    where
+        getDecl :: S.FunctionDeclaration -> Decl
+        getDecl decl@(S.FunDecl name _ _) = (name, S.funDeclToType decl)
+
+        funcToDecl :: S.Expression a -> Maybe Decl
+        funcToDecl (S.FunDeclExpr d _ _) = Just $ getDecl d
+        funcToDecl (S.ExtFunDeclExpr d _ ) = Just $ getDecl d
+        funcToDecl _ = Nothing
+
+        fieldsToTypes :: [S.TupleFiled] -> [S.Type]
+        fieldsToTypes = map (\(S.FunArg _ t) -> t)
+
+        tupleToAlias :: S.Expression a -> Maybe TypeAlias
+        tupleToAlias (S.NamedTupleDeclExpr name fileds _)
+            = Just (name, S.TypeTuple name $ fieldsToTypes fileds)
+        tupleToAlias _ = Nothing
+
+        decls = mapMaybe funcToDecl s
+        aliases = mapMaybe tupleToAlias s
+
+        buildScope :: [Decl] -> [TypeAlias] -> Scope
+        buildScope decls aliases
+            = emptyScope { scopeDeclarations = decls, scopeAliases = aliases }
+
+-- tranformations:
+
+resolveType :: S.Type -> TypeChecker S.Type
+resolveType t@(S.TypeUnknow name) = do 
+    globalScope <- getGlobals
+    let maybeAlias = findAliasInScope globalScope name
+    if Maybe.isNothing maybeAlias
+        then return t
+        else do
+            let Just (nm, ty) = maybeAlias
+            return ty
+
+resolveType a = return a
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
 -- trivially typable expresions:
@@ -142,6 +195,13 @@ transformExpression (S.ArrayExpr rawItems _) = do
         = Maybe.fromMaybe
             (error "Mismatched types in literal array declaration.") 
             (foldr checkItemType (Maybe.listToMaybe types) types)
+
+-- tuple literal:
+transformExpression (S.AnonTupleExpr rawItems _) = do
+    items <- M.forM rawItems transformExpression
+    let types     = map S.tagOfExpr items
+        tupleType = S.TypeTuple "" types
+    return $ S.AnonTupleExpr items tupleType
 
 -- operators:
 transformExpression (S.PrefixOpExpr op arg _) = do
@@ -208,10 +268,11 @@ transformExpression (S.ElementOfExpr name index _) = do
         innerType :: S.Type -> S.Type
         innerType (S.TypePointer (S.TypeArray t)) = t
 
-transformExpression (S.ValDeclExpr (S.ValDecl kind name ty rawValue) _) = do
+transformExpression (S.ValDeclExpr (S.ValDecl kind name t rawValue) _) = do
     typedValue <- transformExpression rawValue
+    ty <- resolveType t
     
-    let message = "In binding of " ++ name
+    let message = "In binding of '" ++ name ++ "'"
     assertType ty (S.tagOfExpr typedValue) message
 
     addLocalDecl (name, ty)
@@ -236,6 +297,9 @@ transformExpression (S.FunDeclExpr funDecl stmt _) = do
 
 transformExpression (S.ExtFunDeclExpr funDecl _)
     = return $ S.ExtFunDeclExpr funDecl $ S.funDeclToType funDecl
+
+transformExpression (S.NamedTupleDeclExpr name fields _)
+    = return $ S.NamedTupleDeclExpr name fields S.TypeUnit
 
 transformStatement :: S.Statement () -> TypeChecker (S.Statement S.Type)
 transformStatement (S.ReturnStmt rawExpr) = do
@@ -290,17 +354,4 @@ transformStatement (S.AssignmentStmt (S.ElementOfExpr name index _) rawExpr) = d
     getElemType (S.TypePointer (S.TypeArray t)) = t
     getElemType t = t
     
-
-findGlobals :: [S.Expression a] -> Scope
-findGlobals = buildScope . map funcToDecl
-    where
-        getDecl :: S.FunctionDeclaration -> Decl
-        getDecl decl@(S.FunDecl name _ _) = (name, S.funDeclToType decl)
-
-        funcToDecl :: S.Expression a -> Decl
-        funcToDecl (S.FunDeclExpr d _ _) = getDecl d
-        funcToDecl (S.ExtFunDeclExpr d _ ) = getDecl d
-
-        buildScope :: [Decl] -> Scope
-        buildScope decls = emptyScope { scopeDeclarations = decls }
 

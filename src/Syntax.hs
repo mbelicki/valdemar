@@ -21,6 +21,8 @@ data Type = TypeFloating BitCount
           | TypeArray Type
           | TypePointer Type
           | TypeFunction [Type] Type
+          | TypeTuple Name [Type]
+          | TypeUnknow Name
           deriving (Eq, Ord, Show)
 
 isArray :: Type -> Bool
@@ -42,6 +44,8 @@ data FunctionDeclaration
 data ValueDeclaration a
     = ValDecl ValueKind Name Type (Expression a) deriving (Eq, Ord, Show)
 
+type TupleFiled = FunctionArgument
+
 funDeclToType :: FunctionDeclaration -> Type
 funDeclToType (FunDecl _ args retType)
     = TypeFunction (map (\(FunArg _ ty) -> ty) args) retType
@@ -52,6 +56,7 @@ data Expression tag
     | CharacterExpr Char tag
     | FloatExpr Double tag
     | ArrayExpr [Expression tag] tag
+    | AnonTupleExpr [Expression tag] tag
     | PrefixOpExpr Operation (Expression tag) tag
     | BinOpExpr Operation (Expression tag) (Expression tag) tag
     | ElementOfExpr Name (Expression tag) tag
@@ -59,7 +64,7 @@ data Expression tag
     | ValDeclExpr (ValueDeclaration tag) tag
     | FunDeclExpr FunctionDeclaration (Statement tag) tag
     | ExtFunDeclExpr FunctionDeclaration tag
-    | NamedTupleDeclExpr Name [FunctionArgument] tag
+    | NamedTupleDeclExpr Name [TupleFiled] tag
     | CallExpr Name [Expression tag] tag
     | CastExpr Type (Expression tag) tag
     deriving (Eq, Ord, Show)
@@ -69,6 +74,7 @@ tagOfExpr (BooleanExpr _ tag) = tag
 tagOfExpr (IntegerExpr _ tag) = tag
 tagOfExpr (FloatExpr _ tag) = tag
 tagOfExpr (ArrayExpr _ tag) = tag
+tagOfExpr (AnonTupleExpr _ tag) = tag
 tagOfExpr (PrefixOpExpr _ _ tag) = tag
 tagOfExpr (BinOpExpr _ _ _ tag) = tag
 tagOfExpr (ElementOfExpr _ _ tag) = tag

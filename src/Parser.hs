@@ -63,6 +63,13 @@ typePointer = do
     ty <- typeDecl
     return $ TypePointer ty
 
+typeUnknow :: Parser Type
+typeUnknow = do
+    name <- identifier
+    if isValidTypeName name
+        then return $ TypeUnknow name
+        else unexpected (show name ++ " is not a valid type name.")
+
 typeDecl :: Parser Type
 typeDecl = typeArray 
        <|> typePointer
@@ -71,6 +78,7 @@ typeDecl = typeArray
        <|> typeFloating 
        <|> typeBoolean 
        <|> typeUnit
+       <|> typeUnknow
 
 int :: Parser (Expression ())
 int = do
@@ -112,6 +120,11 @@ array :: Parser (Expression ())
 array = do
     values <- brackets $ commaSep expr
     return $ ArrayExpr values ()
+
+tuple :: Parser (Expression ())
+tuple = do
+    values <- parens $ commaSep expr
+    return $ AnonTupleExpr values ()
 
 variable :: Parser (Expression ())
 variable = do
@@ -207,6 +220,7 @@ anyExpr = try floating
       <|> try character
       <|> try stringValue
       <|> try array
+      <|> try tuple
       <|> try value
       <|> try function
       <|> try extFunction

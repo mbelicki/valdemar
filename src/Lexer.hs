@@ -7,6 +7,8 @@ import qualified Text.Parsec.Token as Token
 import qualified Text.Parsec.Combinator as Combinator
 import qualified Text.Parsec.Char as Char
 
+import qualified Data.List as List
+
 lexer :: Token.TokenParser ()
 lexer = Token.makeTokenParser style
   where
@@ -20,6 +22,9 @@ lexer = Token.makeTokenParser style
              , Token.reservedNames = keywords
              , Token.caseSensitive = True
              }
+
+isValidTypeName :: String -> Bool
+isValidTypeName n = "_t" `List.isSuffixOf` n
 
 charLiteral :: Parser Char
 charLiteral = Token.charLiteral lexer

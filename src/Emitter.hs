@@ -30,6 +30,9 @@ getLLVMType (S.TypeArray ty)
     = LLVM.StructureType False 
         [arrayIndexType, LLVM.ArrayType 0 $ getLLVMType ty] 
 
+getLLVMType (S.TypeTuple _ tys)
+    = LLVM.StructureType False $ map getLLVMType tys
+
 getLLVMType (S.TypePointer ty)
     = LLVM.PointerType (getLLVMType ty) (LLVM.Addr.AddrSpace 0)
             
@@ -61,6 +64,8 @@ generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType) ty) = do
     let funArgs = transformFuncArgs args
     let llvmType = getLLVMType retType
     CG.external llvmType name funArgs
+
+generateSingleDef (S.NamedTupleDeclExpr{}) = return ()
     
 
 generateCommonDecls :: CG.ModuleBuilder ()
@@ -215,12 +220,20 @@ emitExpression (S.CastExpr ty n _) = do
     op <- emitExpression n
     convert innerType ty op
 
-
 emitExpression (S.CallExpr fun args ty) = do
     argSymbols <- M.mapM emitExpression args
     let retType = getLLVMType ty
         funSybmol = CG.global retType $ LLVM.Name fun
     CG.call funSybmol argSymbols
+
+emitExpression (S.AnonTupleExpr ns ty) = do
+    consts <- M.forM ns $ \n -> emitConstant n
+    let structConst = LLVM.Const.Struct Nothing False consts
+        op = CG.const structConst
+    -- TODO: remove constatns and allow to put any expresion in tuple
+    -- ptr <- CG.alloca $ getLLVMType ty
+    -- CG.store ptr op
+    return op
 
 emitExpression (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n
