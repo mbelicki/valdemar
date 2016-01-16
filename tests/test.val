@@ -61,7 +61,7 @@ fn compare_float (a double_t, b double_t, eps double_t) -> bool_t
     ret vald_fabs(a - b) < eps
 
 fn mutability () -> unit_t {
-    mutval a double_t = 0.0
+    val !a double_t = 0.0
     a = a + 1.0
     if a > 0.0 {
         a = a + 2.0
@@ -79,7 +79,7 @@ fn arrays () -> unit_t {
     print_float(arr[2])
 
     val ints ^[int_t] = [1, 2, 3]
-    val iteger int_t = ints[0]
+    val integer int_t = ints[0]
 
     val bools ^[bool_t] = [true, false]
     if bools[0] {
@@ -114,7 +114,7 @@ fn strings () -> unit_t {
 }
 
 fn print (string str_t) -> unit_t {
-    mutval i int_t = 0
+    val !i int_t = 0
     while i < #string {
         print_char(string[i])
         i = i + 1
@@ -167,7 +167,12 @@ fn structs () -> unit_t {
     val target vec3_t = zeros()
     val up vec3_t = ones()
     val down (double_t, double_t, double_t) = ones()
-    --print_float(position.y)
+
+    val (a double_t, b double_t, c double_t) = up
+    val (x, y, z double_t) = position
+
+    print_float(b)
+    print_float(z)
 }
 
 fn arg_packs (a, b, c double_t) -> double_t {

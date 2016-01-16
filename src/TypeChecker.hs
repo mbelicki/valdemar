@@ -139,8 +139,8 @@ findGlobals s = buildScope decls aliases
         funcToDecl (S.ExtFunDeclExpr d _ ) = Just $ getDecl d
         funcToDecl _ = Nothing
 
-        fieldsToTypes :: [S.TupleFiled] -> [S.Type]
-        fieldsToTypes = map (\(S.FunArg _ t) -> t)
+        fieldsToTypes :: [S.ValueBinding] -> [S.Type]
+        fieldsToTypes = map (\(S.ValBind _ _ t) -> t)
 
         tupleToAlias :: S.Expression a -> Maybe TypeAlias
         tupleToAlias (S.NamedTupleDeclExpr name fileds _)
@@ -180,6 +180,12 @@ resolveType t@(S.TypeFunction args ret) = do
     return $ S.TypeFunction resArgs resRet
 
 resolveType a = return a
+
+
+resolveBinding :: S.ValueBinding -> TypeChecker S.ValueBinding
+resolveBinding (S.ValBind kind nm ty) = do
+    resTy <- resolveType ty
+    return $ S.ValBind kind nm resTy
 
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
@@ -282,7 +288,7 @@ transformExpression (S.ElementOfExpr name index _) = do
         innerType :: S.Type -> S.Type
         innerType (S.TypePointer (S.TypeArray t)) = t
 
-transformExpression (S.ValDeclExpr (S.ValDecl kind name t rawValue) _) = do
+transformExpression (S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
     typedValue <- transformExpression rawValue
     ty <- resolveType t
     otherTy <- resolveType $ S.tagOfExpr typedValue
@@ -292,7 +298,22 @@ transformExpression (S.ValDeclExpr (S.ValDecl kind name t rawValue) _) = do
 
     addLocalDecl (name, ty)
 
-    return $ S.ValDeclExpr (S.ValDecl kind name ty typedValue) ty
+    return $ S.ValDeclExpr (S.ValBind kind name ty) typedValue ty
+
+transformExpression (S.ValDestructuringExpr bindings rawValue _) = do
+    typedValue <- transformExpression rawValue
+    otherTy <- resolveType $ S.tagOfExpr typedValue
+
+    resolvedBindings <- M.mapM resolveBinding bindings
+    let packedType = S.TypeTuple "" (map (\(S.ValBind _ _ t) -> t) resolvedBindings)
+    
+    let names = foldr (\a b -> b ++ show a) "" resolvedBindings
+        message = "In destructuring binding of (" ++ names ++ ")"
+    assertType packedType otherTy message
+
+    M.forM_ resolvedBindings $ \(S.ValBind _ name ty) -> addLocalDecl (name, ty)
+
+    return $ S.ValDestructuringExpr resolvedBindings typedValue otherTy
 
 -- function declarations:
 transformExpression (S.FunDeclExpr funDecl stmt _) = do
@@ -310,18 +331,13 @@ transformExpression (S.FunDeclExpr funDecl stmt _) = do
   where
     declareArguments :: S.FunctionDeclaration -> TypeChecker ()
     declareArguments (S.FunDecl _ args _)
-        = M.forM_ args $ \(S.FunArg name ty) -> addLocalDecl (name, ty)
+        = M.forM_ args $ \(S.ValBind _ name ty) -> addLocalDecl (name, ty)
 
     resolveFunDecl :: S.FunctionDeclaration -> TypeChecker S.FunctionDeclaration
     resolveFunDecl (S.FunDecl name args retTy) = do
-        resolvedArgs <- M.mapM resolveArg args
+        resolvedArgs <- M.mapM resolveBinding args
         resolvedRetTy <- resolveType retTy
         return $ S.FunDecl name resolvedArgs resolvedRetTy
-
-    resolveArg :: S.FunctionArgument -> TypeChecker S.FunctionArgument
-    resolveArg (S.FunArg nm ty) = do
-        resTy <- resolveType ty
-        return $ S.FunArg nm resTy
 
 
 transformExpression (S.ExtFunDeclExpr funDecl _)

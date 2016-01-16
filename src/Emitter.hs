@@ -37,9 +37,9 @@ getLLVMType (S.TypePointer ty)
     = LLVM.PointerType (getLLVMType ty) (LLVM.Addr.AddrSpace 0)
             
 
-transformFuncArgs :: [S.FunctionArgument] -> [CG.Argument]
+transformFuncArgs :: [S.ValueBinding] -> [CG.Argument]
 transformFuncArgs
-    = map (\(S.FunArg name ty) -> (getLLVMType ty, LLVM.Name name, name))
+    = map (\(S.ValBind _ name ty) -> (getLLVMType ty, LLVM.Name name, name))
 
 generateSingleDef :: S.Expression S.Type -> CG.ModuleBuilder ()
 generateSingleDef (S.FunDeclExpr (S.FunDecl name args retType) body ty) = do
@@ -188,11 +188,28 @@ emitExpression e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
 emitExpression e@(S.IntegerExpr n ty) = M.liftM CG.const $ emitConstant e
 emitExpression e@(S.BooleanExpr n ty) = M.liftM CG.const $ emitConstant e
 emitExpression (S.VarExpr n ty) = CG.getLocal n >>= CG.load
-emitExpression (S.ValDeclExpr (S.ValDecl kind name typeName n) ty) = do
+emitExpression (S.ValDeclExpr (S.ValBind kind name typeName) n ty) = do
     op <- emitExpression n
     ptr <- CG.alloca $ getLLVMType typeName
     CG.store ptr op
     CG.assignLocal name ptr
+    return op
+
+emitExpression (S.ValDestructuringExpr bindings n ty) = do
+    op <- emitExpression n
+    ptr <- CG.alloca $ getLLVMType ty
+    CG.store ptr op
+    -- index bindings
+    let indexedBindings = zip [0..] bindings
+    -- allocate all variables on the stack
+    M.forM_ indexedBindings $ \(i, S.ValBind kind name rawType) -> do
+        varPtr <- CG.alloca $ getLLVMType rawType 
+        let offset       = CG.const $ LLVM.Const.Int 32 0
+            memberOffset = CG.const $ LLVM.Const.Int 32 i
+        memberPtr <- CG.getElementPtr ptr [offset, memberOffset]
+        memberOp <- CG.load memberPtr
+        CG.store varPtr memberOp
+        CG.assignLocal name varPtr
     return op
 
 emitExpression (S.PrefixOpExpr op a ty)

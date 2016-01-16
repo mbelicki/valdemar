@@ -10,7 +10,7 @@ data Operation
     | ArrayLen                       -- array lenght
     deriving (Eq, Ord, Show)
 
-data ValueKind = Immutable | Mutable deriving (Eq, Ord, Show)
+data BindingKind = Immutable | Mutable deriving (Eq, Ord, Show)
 
 type BitCount = Int
 
@@ -37,18 +37,14 @@ isArrayPointer :: Type -> Bool
 isArrayPointer (TypePointer ty) = isArray ty
 isArrayPointer _ = False
 
-data FunctionArgument
-    = FunArg Name Type deriving (Eq, Ord, Show)
+data ValueBinding
+    = ValBind BindingKind Name Type deriving (Eq, Ord, Show)
 data FunctionDeclaration
-    = FunDecl Name [FunctionArgument] Type deriving (Eq, Ord, Show)
-data ValueDeclaration a
-    = ValDecl ValueKind Name Type (Expression a) deriving (Eq, Ord, Show)
-
-type TupleFiled = FunctionArgument
+    = FunDecl Name [ValueBinding] Type deriving (Eq, Ord, Show)
 
 funDeclToType :: FunctionDeclaration -> Type
 funDeclToType (FunDecl _ args retType)
-    = TypeFunction (map (\(FunArg _ ty) -> ty) args) retType
+    = TypeFunction (map (\(ValBind _ _ ty) -> ty) args) retType
 
 data Expression tag
     = BooleanExpr Bool tag
@@ -61,10 +57,11 @@ data Expression tag
     | BinOpExpr Operation (Expression tag) (Expression tag) tag
     | ElementOfExpr Name (Expression tag) tag
     | VarExpr Name tag
-    | ValDeclExpr (ValueDeclaration tag) tag
+    | ValDeclExpr ValueBinding (Expression tag) tag
+    | ValDestructuringExpr [ValueBinding] (Expression tag) tag
     | FunDeclExpr FunctionDeclaration (Statement tag) tag
     | ExtFunDeclExpr FunctionDeclaration tag
-    | NamedTupleDeclExpr Name [TupleFiled] tag
+    | NamedTupleDeclExpr Name [ValueBinding] tag
     | CallExpr Name [Expression tag] tag
     | CastExpr Type (Expression tag) tag
     deriving (Eq, Ord, Show)
@@ -79,7 +76,8 @@ tagOfExpr (PrefixOpExpr _ _ tag) = tag
 tagOfExpr (BinOpExpr _ _ _ tag) = tag
 tagOfExpr (ElementOfExpr _ _ tag) = tag
 tagOfExpr (VarExpr _ tag) = tag
-tagOfExpr (ValDeclExpr _ tag) = tag
+tagOfExpr (ValDeclExpr _ _ tag) = tag
+tagOfExpr (ValDestructuringExpr _ _ tag) = tag
 tagOfExpr (FunDeclExpr _ _ tag) = tag
 tagOfExpr (ExtFunDeclExpr _ tag) = tag
 tagOfExpr (CallExpr _ _ tag) = tag

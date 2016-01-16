@@ -5,6 +5,7 @@ import Text.Parsec.String (Parser)
 
 import qualified Text.Parsec.Expr as E
 import qualified Text.Parsec.Token as T
+import qualified Text.Parsec.Char as C
 
 import qualified Control.Monad as M
 
@@ -135,41 +136,50 @@ variable = do
     name <- identifier
     return $ VarExpr name ()
 
-funArg :: Parser FunctionArgument
-funArg = do
-    name <- identifier
-    typeName <- typeDecl
-    return $ FunArg name typeName
+valueDeclKind :: Parser BindingKind
+valueDeclKind = (operator "!" >> return Mutable)
+            <|> return Immutable
 
-funArgPack :: Parser [FunctionArgument]
-funArgPack = do
-    names <- commaSepNoDangling identifier
-    typeName <- typeDecl
-    return $ map (`FunArg` typeName) names
-
-argList :: Parser [FunctionArgument]
-argList = do
-    let singleArg = M.liftM (: []) funArg
-    args <- commaSep (try singleArg <|> funArgPack)
-    return $ concat args
-
-valueDeclKind :: Parser ValueKind
-valueDeclKind = (reserved "val" >> return Immutable)
-            <|> (reserved "mutval" >> return Mutable)
-
-valueDecl :: Parser (ValueDeclaration ())
+valueDecl :: Parser ValueBinding
 valueDecl = do
     kind <- valueDeclKind
     name <- identifier
     typeName <- typeDecl
-    reserved "="
-    body <- expr
-    return $ ValDecl kind name typeName body
+    return $ ValBind kind name typeName
+
+bindingPack :: Parser [ValueBinding]
+bindingPack = do
+    names <- commaSepNoDangling kindNamePair
+    typeName <- typeDecl
+    return $ map (\(kind, name) -> ValBind kind name typeName) names
+  where
+    kindNamePair :: Parser (BindingKind, Name)
+    kindNamePair = do
+        kind <- valueDeclKind
+        name <- identifier
+        return (kind, name)
+
+argList :: Parser [ValueBinding]
+argList = do
+    let singleArg = M.liftM (: []) valueDecl
+    args <- commaSep (try singleArg <|> bindingPack)
+    return $ concat args
 
 value :: Parser (Expression ())
 value = do
+    reserved "val"
     decl <- valueDecl
-    return $ ValDeclExpr decl ()
+    reserved "="
+    body <- expr
+    return $ ValDeclExpr decl body ()
+
+valueDestruct :: Parser (Expression ())
+valueDestruct = do
+    reserved "val"
+    decls <- parens argList
+    reserved "="
+    body <- expr
+    return $ ValDestructuringExpr decls body ()
 
 functionDecl :: Parser FunctionDeclaration
 functionDecl = do
@@ -226,6 +236,7 @@ anyExpr = try floating
       <|> try array
       <|> try tuple
       <|> try value
+      <|> try valueDestruct
       <|> try function
       <|> try extFunction
       <|> try cast
@@ -245,7 +256,7 @@ returnStmt = do
 
 expressionStmt :: Parser (Statement ())
 expressionStmt = do
-    e <- value <|> call
+    e <- try value <|> valueDestruct <|> call
     return $ ExpressionStmt e
 
 blockStmt :: Parser (Statement ())
@@ -260,7 +271,7 @@ ifStmt = do
 
 whileStmt :: Parser (Statement ())
 whileStmt = do
-    reserved "while" 
+    reserved "while"
     cond <- expr
     body <- statement
     return $ WhileStmt cond body
