@@ -19,6 +19,8 @@ binary symbol func
 
 table = [ [ prefix "#" ArrayLen ]
         , [ prefix "not" LogNot ]
+        , [ prefix "@" ValRef ]
+        , [ prefix "$" PtrDeRef ]
         , [ binary "*" Mul E.AssocLeft
           , binary "/" Div E.AssocLeft
           ]
@@ -60,7 +62,7 @@ typeString = reserved "str_t" >> return (TypePointer $ TypeArray $ TypeInteger 8
 
 typePointer :: Parser Type
 typePointer = do
-    reserved "^"
+    operator "^"
     ty <- typeDecl
     return $ TypePointer ty
 
@@ -250,7 +252,7 @@ expr = E.buildExpressionParser table anyExpr
 
 returnStmt :: Parser (Statement ())
 returnStmt = do
-    reserved "ret" 
+    reserved "return"
     e <- expr
     return $ ReturnStmt e
 

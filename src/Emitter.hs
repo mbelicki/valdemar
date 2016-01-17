@@ -118,6 +118,13 @@ emitStatement (S.AssignmentStmt (S.VarExpr name _) n) = do
     CG.store var op
     return ()
 
+emitStatement (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef (S.VarExpr name _) _) n) = do
+    op <- emitExpression n
+    var <- CG.getLocal name
+    ptr <- CG.load var
+    CG.store ptr op
+    return ()
+
 emitStatement (S.AssignmentStmt e@(S.ElementOfExpr{}) n) = do
     op <- emitExpression n
     var <- getElementPtr e
@@ -157,6 +164,8 @@ binaryOperators = Map.fromList
 unaryOperators = Map.fromList 
     [ (S.LogNot, CG.logNot)
     , (S.ArrayLen, getArrayLenght)
+    , (S.ValRef, getAddress)
+    , (S.PtrDeRef, getValue)
     ]
 
 conversions = Map.fromList
@@ -182,6 +191,14 @@ getArrayLenght arrayOp = do
     countOp <- CG.load countLocOp
 
     CG.zext (getLLVMType $ S.TypeInteger 64) countOp
+
+getAddress :: LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+getAddress valueOp = do
+    let offset = CG.const $ LLVM.Const.Int 32 0
+    CG.getElementPtr valueOp [offset]
+
+getValue :: LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+getValue = CG.load
 
 emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExpression e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
@@ -212,9 +229,15 @@ emitExpression (S.ValDestructuringExpr bindings n ty) = do
         CG.assignLocal name varPtr
     return op
 
+emitExpression (S.PrefixOpExpr S.ValRef (S.VarExpr name _) _)
+    = CG.getLocal name
+
+emitExpression (S.PrefixOpExpr S.ValRef a ty)
+    = error $ "Cannot derefernece: " ++ show a
+
 emitExpression (S.PrefixOpExpr op a ty)
     = case Map.lookup op unaryOperators of
-        Nothing -> error "TODO: fail gracefully when operator is missing."
+        Nothing -> error $ "Operator is missing: " ++ show op ++ ", " ++ show ty
         Just instr -> do
             opA <- emitExpression a
             instr opA

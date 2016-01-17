@@ -12,10 +12,10 @@ import qualified Data.List as List
 lexer :: Token.TokenParser ()
 lexer = Token.makeTokenParser style
   where
-    opeators = [ "+", "-", "*", "/", "&", "|"
-               , "==", "/=", "<", "<=", ">", ">=", "[", "]", "^"
+    opeators = [ "+", "-", "*", "/", "&", "|", "!", "@", "$"
+               , "==", "/=", "<", "<=", ">", ">=", "[", "]", "^", "not"
                ]
-    keywords = ["val", "mutval", "fn", "ext_c", "ret", "if", "not", "tuple"]
+    keywords = ["val", "fn", "ext_c", "return", "if", "not", "tuple"]
     style = emptyDef
              { Token.commentLine = "--"
              , Token.reservedOpNames = opeators

@@ -1,27 +1,27 @@
 -- this is the first code ever written and compiled in valdemar
 
 fn sq (a double_t) -> double_t {
-    ret a * a
+    return a * a
 }
 
 fn add_sq (a double_t, b double_t) -> double_t {
-    ret sq(a) + sq(b)
+    return sq(a) + sq(b)
 }
 
 fn inc (a double_t) -> double_t {
-    ret a + 1.0
+    return a + 1.0
 }
 
 ext_c sin (a double_t) -> double_t
 
 fn cos_sq (a double_t) -> double_t {
-    ret 1.0 - sq(sin(a))
+    return 1.0 - sq(sin(a))
 }
 
 fn locals() -> double_t {
     val pi double_t = 3.14
     val a double_t = cos_sq(pi)
-    ret a * pi * 2.0
+    return a * pi * 2.0
 }
 
 ext_c print_float (a double_t) -> unit_t
@@ -31,10 +31,10 @@ fn side_effects(a double_t) -> unit_t {
 }
 
 fn booleans(a bool_t, b bool_t) -> bool_t {
-    ret a | b & b
+    return a | b & b
 }
 
-fn no_braces(a double_t) -> double_t ret 2.0 * a
+fn no_braces(a double_t) -> double_t return 2.0 * a
 
 fn branching (a double_t, more bool_t) -> unit_t {
     if more {
@@ -53,12 +53,12 @@ fn count_down(a double_t) -> unit_t {
 }
 
 fn vald_fabs(a double_t) -> double_t {
-    if a < 0.0 ret a * -1.0
-    ret a
+    if a < 0.0 return a * -1.0
+    return a
 }
 
 fn compare_float (a double_t, b double_t, eps double_t) -> bool_t
-    ret vald_fabs(a - b) < eps
+    return vald_fabs(a - b) < eps
 
 fn mutability () -> unit_t {
     val !a double_t = 0.0
@@ -69,7 +69,7 @@ fn mutability () -> unit_t {
     print_float(a)
 }
 
-fn get_int() -> int_t ret 4
+fn get_int() -> int_t return 4
 
 fn arrays () -> unit_t {
     val arr ^[double_t] = [1.0, 2.1, 3.2]
@@ -150,23 +150,19 @@ tuple vec3_t {
     x, y, z double_t
 }
 
--- fn mutate(a ^complex_t) -> unit_t {
---     a->imag = 1.0
--- }
-
 fn zeros () -> (double_t, double_t, double_t) {
-    ret (0.0, 0.0, 0.0)
+    return (0.0, 0.0, 0.0)
 }
 
 fn ones () -> vec3_t {
     val one double_t = 1.0
-    ret (one, one, one)
+    return (one, one, one)
 }
 
 fn vec3_add(a, b vec3_t) -> vec3_t {
     val (x1, y1, z1 double_t) = a
     val (x2, y2, z2 double_t) = b
-    ret (x1 + x2, y1 + y2, z1 + z2)
+    return (x1 + x2, y1 + y2, z1 + z2)
 }
 
 fn vec3_print(a vec3_t) -> unit_t {
@@ -176,20 +172,28 @@ fn vec3_print(a vec3_t) -> unit_t {
     print_float(z)
 }
 
+fn fill_with_zeros(a ^vec3_t) -> unit_t {
+    $a = (0.0, 0.0, 0.0)
+}
+
 fn structs () -> unit_t {
     val position vec3_t = (0.0, 1.0, 2.0)
-    val target vec3_t = zeros()
-    val up vec3_t = ones()
+    --val target vec3_t = zeros()
+    --val up vec3_t = ones()
 
-    vec3_print(vec3_add(position, up))
+    --val vec vec3_t = val (x, y, z double_t) = vec3_add(position, up)
+    --vec3_print(vec)
+    
+    val pos ^vec3_t = @position
+    fill_with_zeros(pos)
+    vec3_print($pos)
 }
 
 fn arg_packs (a, b, c double_t) -> double_t {
-    ret a + b * c
+    return a + b * c
 }
 
 fn main () -> unit_t {
-    print_float(arg_packs(1.0, 2.0, 3.0))
     structs()
 }
 

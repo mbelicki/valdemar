@@ -8,6 +8,7 @@ data Operation
     | LogNot                         -- logical not
     | Eq | Neq | Lt | Lte | Gt | Gte -- comparison
     | ArrayLen                       -- array lenght
+    | ValRef | PtrDeRef              -- value dereference and pointer reference
     deriving (Eq, Ord, Show)
 
 data BindingKind = Immutable | Mutable deriving (Eq, Ord, Show)

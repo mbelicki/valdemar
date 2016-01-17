@@ -110,6 +110,8 @@ findDecl name = do
 assertType :: S.Type -> S.Type -> String -> TypeChecker ()
 assertType (S.TypeTuple _ exp_tys) (S.TypeTuple _ act_tys) message
     = when (exp_tys /= act_tys) $ error message
+assertType (S.TypePointer exp_ty) (S.TypePointer act_ty) message
+    = assertType exp_ty act_ty message
 assertType expected actual message
     = when (expected /= actual) $ error $ message ++ explanation
         where
@@ -230,6 +232,8 @@ transformExpression (S.PrefixOpExpr op arg _) = do
   where
     getOpType :: S.Operation -> S.Type -> S.Type
     getOpType op _ | op `elem` [S.ArrayLen] = S.TypeInteger 64
+    getOpType op argTy | op `elem` [S.ValRef] = S.TypePointer argTy
+    getOpType op (S.TypePointer ty) | op `elem` [S.PtrDeRef] = ty
     getOpType _ argType = argType
 
 transformExpression (S.BinOpExpr op argA argB _) = do
@@ -383,6 +387,24 @@ transformStatement (S.AssignmentStmt (S.VarExpr name _) rawExpr) = do
     assertType (snd decl) (S.tagOfExpr typedExpr) $ "Cannot assing to " ++ name
 
     return $ S.AssignmentStmt (S.VarExpr name (snd decl)) typedExpr
+
+transformStatement 
+        (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef (S.VarExpr name _) _) rawExpr) = do
+    typedExpr <- transformExpression rawExpr
+    let ptrType = S.TypePointer $ S.tagOfExpr typedExpr
+        fail = error $ "Cannot write to location pointed by unknown variable: " ++ name
+    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
+    varType <- resolveType $ snd decl
+    
+    assertType varType ptrType $ "Cannot assing to $" ++ name
+
+    let varExpr = S.VarExpr name (snd decl)
+        prefixOperatorExpr = S.PrefixOpExpr S.PtrDeRef varExpr ptrType
+    return $ S.AssignmentStmt prefixOperatorExpr typedExpr
+            
+
+transformStatement (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef n _) rawExpr)
+    = error $ "Cannot get address of: " ++ show n
 
 transformStatement (S.AssignmentStmt (S.ElementOfExpr name index _) rawExpr) = do
     typedExpr <- transformExpression rawExpr
