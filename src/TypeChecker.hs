@@ -298,7 +298,8 @@ transformExpression (S.BinOpExpr op argA argB _) = do
 transformExpression (S.VarExpr name _) = do
     let fail = error $ "Unknown variable: " ++ name
     decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
-    return $ S.VarExpr name $ snd decl
+    resType <- resolveType $ snd decl
+    return $ S.VarExpr name resType
 
 transformExpression (S.CallExpr name args _) = do
     let declFail = error $ "Unknown function: " ++ name
@@ -426,48 +427,12 @@ transformStatement (S.WhileStmt rawCondition rawBody) = do
     typedBody <- transformStatement rawBody
     return $ S.WhileStmt typedCondition typedBody
 
-transformStatement (S.AssignmentStmt (S.VarExpr name _) rawExpr) = do
-    typedExpr <- transformExpression rawExpr
+transformStatement (S.AssignmentStmt rawLhs rawRhs) = do
+    -- TODO: check if lhs is valid lhs expression
+    lhs <- transformExpression rawLhs
+    rhs <- transformExpression rawRhs
+
+    assertType (S.tagOfExpr lhs) (S.tagOfExpr rhs) "Cannot assign, incompatible types."
+
+    return $ S.AssignmentStmt lhs rhs
     
-    let fail = error $ "Unknown variable: " ++ name
-    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
-    
-    assertType (snd decl) (S.tagOfExpr typedExpr) $ "Cannot assing to " ++ name
-
-    return $ S.AssignmentStmt (S.VarExpr name (snd decl)) typedExpr
-
-transformStatement 
-        (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef (S.VarExpr name _) _) rawExpr) = do
-    typedExpr <- transformExpression rawExpr
-    let ptrType = S.TypePointer $ S.tagOfExpr typedExpr
-        fail = error $ "Cannot write to location pointed by unknown variable: " ++ name
-    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
-    varType <- resolveType $ snd decl
-    
-    assertType varType ptrType $ "Cannot assing to $" ++ name
-
-    let varExpr = S.VarExpr name (snd decl)
-        prefixOperatorExpr = S.PrefixOpExpr S.PtrDeRef varExpr ptrType
-    return $ S.AssignmentStmt prefixOperatorExpr typedExpr
-            
-
-transformStatement (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef n _) rawExpr)
-    = error $ "Cannot get address of: " ++ show n
-
-transformStatement (S.AssignmentStmt (S.ElementOfExpr name index _) rawExpr) = do
-    typedExpr <- transformExpression rawExpr
-    typedIndex <- transformExpression index
-    
-    let fail = error $ "Unknown variable: " ++ name
-    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
-    
-    assertType (getElemType $ snd decl) (S.tagOfExpr typedExpr) $ "Cannot assing to " ++ name
-    assertType (S.TypeInteger 64) (S.tagOfExpr typedIndex) "Invalid index type"
-
-    return $ S.AssignmentStmt (S.ElementOfExpr name typedIndex (snd decl)) typedExpr
-  where
-    getElemType :: S.Type -> S.Type
-    getElemType (S.TypePointer (S.TypeArray t)) = t
-    getElemType t = t
-    
-

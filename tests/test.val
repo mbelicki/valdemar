@@ -187,6 +187,11 @@ fn structs () -> unit_t {
     if position.x + 1.0 == pos->y {
         print("member access seems to work")
     }
+
+    pos->x = 0.5
+    position.y = 1.2
+
+    vec3_print(position)
 }
 
 fn arg_packs (a, b, c double_t) -> double_t {
@@ -194,6 +199,7 @@ fn arg_packs (a, b, c double_t) -> double_t {
 }
 
 fn main () -> unit_t {
+    array_assignment()
     structs()
 }
 

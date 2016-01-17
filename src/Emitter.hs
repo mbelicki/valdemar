@@ -114,24 +114,11 @@ emitStatement (S.WhileStmt cond body) = do
     CG.setBlock endBlock
     return ()
 
-emitStatement (S.AssignmentStmt (S.VarExpr name _) n) = do
-    op <- emitExprForValue n
-    var <- CG.getLocal name
-    CG.store var op
+emitStatement (S.AssignmentStmt lhs rhs) = do
+    val <- emitExprForValue rhs
+    ptr <- emitExprForAddress lhs
+    CG.store ptr val
     return ()
-
-emitStatement (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef (S.VarExpr name _) _) n) = do
-    op <- emitExprForValue n
-    ptr <- CG.getLocal name >>= CG.load
-    CG.store ptr op
-    return ()
-
-emitStatement (S.AssignmentStmt e@(S.ElementOfExpr{}) n) = do
-    op <- emitExprForValue n
-    var <- getElementPtr e
-    CG.store var op
-    return ()
-    
 
 binaryOperators = Map.fromList 
     [ ((S.Add,    False), CG.fadd)
@@ -209,6 +196,56 @@ emitExprForAddress n@(S.ValDeclExpr (S.ValBind _ name _) _ _) = do
 emitExprForAddress (S.PrefixOpExpr S.PtrDeRef n _)
     = emitExprForValue n -- n evaluates to pointer
 
+emitExprForAddress (S.ElementOfExpr name index ty) = do
+    indexOp <- emitExprForValue index
+    arrayOp <- CG.getLocal name >>= CG.load
+
+    let offset      = CG.const $ LLVM.Const.Int 32 0
+        dataOffset  = CG.const $ LLVM.Const.Int 32 1
+        countOffset = CG.const $ LLVM.Const.Int 32 0
+
+    let emitBoudCheck = True
+
+    M.when emitBoudCheck $ do
+        failBlock <- CG.addBlock "bounds.fail"
+        succBlock  <- CG.addBlock "bounds.success"
+        
+        countLocOp <- CG.getElementPtr arrayOp [offset, countOffset]
+        countOp <- CG.load countLocOp
+
+        truncedIndexOp <- CG.trunc (getLLVMType $ S.TypeInteger 32) indexOp
+        
+        compResultOp <- CG.ilt truncedIndexOp countOp 
+        CG.condBr compResultOp succBlock failBlock
+
+        CG.setBlock failBlock
+        let funSybmol = CG.global LLVM.VoidType $ LLVM.Name "bounds_check_failed"
+        CG.call funSybmol []
+        CG.br succBlock
+
+        M.void $ CG.setBlock succBlock
+
+    CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
+
+
+emitExprForAddress (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
+    tuplePtr <- emitExprForAddress n
+
+    let S.TypeTuple tupleName fields = S.tagOfExpr n
+        maybeOffset = getFieldOffset fields name
+
+    M.unless (Maybe.isJust maybeOffset) $ error $ "Tuple: '" ++ tupleName 
+        ++ "' does not contain field: '" ++ name ++ "'"
+
+    let Just rawOffset = maybeOffset
+        offset      = CG.const $ LLVM.Const.Int 32 0
+        fieldOffset = CG.const $ LLVM.Const.Int 32 $ fromIntegral rawOffset
+
+    CG.getElementPtr tuplePtr [offset, fieldOffset]
+  where
+    getFieldOffset :: [S.TupleFiled] -> S.Name -> Maybe Int
+    getFieldOffset fields name = List.findIndex (\(S.Field nm _) -> nm == name) fields
+
 emitExprForValue :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExprForValue e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
 emitExprForValue e@(S.IntegerExpr n ty) = M.liftM CG.const $ emitConstant e
@@ -251,24 +288,9 @@ emitExprForValue (S.PrefixOpExpr op a ty)
             opA <- emitExprForValue a
             instr opA
 
-emitExprForValue (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
-    tuplePtr <- emitExprForAddress n
-
-    let S.TypeTuple tupleName fields = S.tagOfExpr n
-        maybeOffset = getFieldOffset fields name
-
-    M.unless (Maybe.isJust maybeOffset) $ error $ "Tuple: '" ++ tupleName 
-        ++ "' does not contain field: '" ++ name ++ "'"
-
-    let Just rawOffset = maybeOffset
-        offset      = CG.const $ LLVM.Const.Int 32 0
-        fieldOffset = CG.const $ LLVM.Const.Int 32 $ fromIntegral rawOffset
-
-    memberPtr <- CG.getElementPtr tuplePtr [offset, fieldOffset]
-    CG.load memberPtr
-  where
-    getFieldOffset :: [S.TupleFiled] -> S.Name -> Maybe Int
-    getFieldOffset fields name = List.findIndex (\(S.Field nm _) -> nm == name) fields
+emitExprForValue n@(S.BinOpExpr S.MemberOf _ _ _) = do
+    ptr <- emitExprForAddress n
+    CG.load ptr
 
 emitExprForValue (S.BinOpExpr op a b ty)
     = case Map.lookup (op, isInt (S.tagOfExpr a)) binaryOperators of
@@ -325,39 +347,7 @@ emitExprForValue (S.ArrayExpr ns ty) = do
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
-emitExprForValue e@(S.ElementOfExpr{}) = getElementPtr e >>= CG.load
- 
-getElementPtr :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
-getElementPtr (S.ElementOfExpr name index ty) = do
-    indexOp <- emitExprForValue index
-    arrayOp <- CG.getLocal name >>= CG.load
-
-    let offset      = CG.const $ LLVM.Const.Int 32 0
-        dataOffset  = CG.const $ LLVM.Const.Int 32 1
-        countOffset = CG.const $ LLVM.Const.Int 32 0
-
-    let emitBoudCheck = True
-
-    M.when emitBoudCheck $ do
-        failBlock <- CG.addBlock "bounds.fail"
-        succBlock  <- CG.addBlock "bounds.success"
-        
-        countLocOp <- CG.getElementPtr arrayOp [offset, countOffset]
-        countOp <- CG.load countLocOp
-
-        truncedIndexOp <- CG.trunc (getLLVMType $ S.TypeInteger 32) indexOp
-        
-        compResultOp <- CG.ilt truncedIndexOp countOp 
-        CG.condBr compResultOp succBlock failBlock
-
-        CG.setBlock failBlock
-        let funSybmol = CG.global LLVM.VoidType $ LLVM.Name "bounds_check_failed"
-        CG.call funSybmol []
-        CG.br succBlock
-
-        M.void $ CG.setBlock succBlock
-
-    CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
+emitExprForValue e@(S.ElementOfExpr{}) = emitExprForAddress e >>= CG.load
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n)
