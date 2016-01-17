@@ -192,6 +192,17 @@ fn structs () -> unit_t {
     position.y = 1.2
 
     vec3_print(position)
+
+    val vectors ^[vec3_t] = [(0.0, 0.0, 0.0), (1.0, 2.0, 3.0), (0.1, 0.2, 0.3)]
+    vectors[0] = ones()
+    fill_with_zeros(@vectors[2])
+
+    print("array element 0:")
+    vec3_print(vectors[0])
+    print("array element 1:")
+    vec3_print(vectors[1])
+    print("array element 2:")
+    vec3_print(vectors[2])
 }
 
 fn arg_packs (a, b, c double_t) -> double_t {

@@ -111,6 +111,8 @@ findDecl name = do
 assertType :: S.Type -> S.Type -> String -> TypeChecker ()
 assertType (S.TypePointer exp_ty) (S.TypePointer act_ty) message
     = assertType exp_ty act_ty message
+assertType (S.TypeArray exp_ty) (S.TypeArray act_ty) message
+    = assertType exp_ty act_ty message
 
 assertType (S.TypeTuple exp_name exp_fs) (S.TypeTuple act_name act_fs) message
     = unless compatible $ error message
@@ -313,10 +315,10 @@ transformExpression (S.CallExpr name args _) = do
     actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
     expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
 
-    let typedExpr = S.CallExpr name typedArgs $ getReturnType $ snd decl
-    return $ if actualArgTypes == expectedArgTypes
-             then typedExpr
-             else argTypeFail expectedArgTypes actualArgTypes
+    unless (actualArgTypes == expectedArgTypes) $ argTypeFail expectedArgTypes actualArgTypes
+
+    resType <- resolveType $ getReturnType $ snd decl
+    return $ S.CallExpr name typedArgs resType
     where
         getReturnType :: S.Type -> S.Type
         getReturnType (S.TypeFunction _ ret) = ret
@@ -334,8 +336,9 @@ transformExpression (S.ElementOfExpr name index _) = do
     arrayDecl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
     -- check if array declaration from current scope has correct type
     M.unless (S.isArrayPointer $ snd arrayDecl) $ error $ name ++ " is not array pointer."
-
-    return $ S.ElementOfExpr name typedIndex (innerType $ snd arrayDecl)
+    
+    resType <- resolveType $ innerType $ snd arrayDecl
+    return $ S.ElementOfExpr name typedIndex resType
     where
         innerType :: S.Type -> S.Type
         innerType (S.TypePointer (S.TypeArray t)) = t

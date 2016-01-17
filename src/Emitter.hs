@@ -275,11 +275,8 @@ emitExprForValue (S.ValDestructuringExpr bindings n ty) = do
         CG.assignLocal name varPtr
     return op
 
-emitExprForValue (S.PrefixOpExpr S.ValRef (S.VarExpr name _) _)
-    = CG.getLocal name
-
-emitExprForValue (S.PrefixOpExpr S.ValRef a ty)
-    = error $ "Cannot derefernece: " ++ show a
+emitExprForValue (S.PrefixOpExpr S.ValRef n _)
+    = emitExprForAddress n
 
 emitExprForValue (S.PrefixOpExpr op a ty)
     = case Map.lookup op unaryOperators of
@@ -354,6 +351,9 @@ emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n
 emitConstant (S.BooleanExpr n ty) = return $ LLVM.Const.Int 1 (toInteger $ fromEnum n)
 emitConstant (S.IntegerExpr n (S.TypeInteger bits))
     = return $ LLVM.Const.Int (fromIntegral bits) (toInteger n)
+emitConstant (S.AnonTupleExpr ns ty) = do
+    consts <- M.forM ns $ \n -> emitConstant n
+    return $ LLVM.Const.Struct Nothing False consts
 
 liftError :: Except.ExceptT String IO a -> IO a
 liftError = Except.runExceptT M.>=> either fail return
