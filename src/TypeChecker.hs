@@ -130,6 +130,10 @@ isTuple :: S.Type -> Bool
 isTuple (S.TypeTuple _ _) = True
 isTuple _ = False
 
+isPointer :: S.Type -> Bool
+isPointer (S.TypePointer _) = True
+isPointer _ = False
+
 -- entry point:
 
 typeCheck :: [S.Expression ()] -> [S.Expression S.Type]
@@ -248,6 +252,12 @@ transformExpression (S.PrefixOpExpr op arg _) = do
     getOpType op argTy | op `elem` [S.ValRef] = S.TypePointer argTy
     getOpType op (S.TypePointer ty) | op `elem` [S.PtrDeRef] = ty
     getOpType _ argType = argType
+
+transformExpression (S.BinOpExpr S.DeRefMemberOf arg member _) = do
+    -- transform into dereference + member access:
+    let newArg = S.PrefixOpExpr S.PtrDeRef arg ()
+        expr = S.BinOpExpr S.MemberOf newArg member ()
+    transformExpression expr
 
 transformExpression (S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
     typed <- transformExpression arg

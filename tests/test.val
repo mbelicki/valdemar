@@ -184,7 +184,7 @@ fn structs () -> unit_t {
     vec3_print(position)
 
     $pos = (0.0, 1.0, 2.0)
-    if position.x + 1.0 == position.y {
+    if position.x + 1.0 == pos->y {
         print("member access seems to work")
     }
 }

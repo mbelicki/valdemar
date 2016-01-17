@@ -206,6 +206,8 @@ emitExprForAddress (S.VarExpr n _) = CG.getLocal n
 emitExprForAddress n@(S.ValDeclExpr (S.ValBind _ name _) _ _) = do
     op <- emitExprForValue n
     CG.getLocal name
+emitExprForAddress (S.PrefixOpExpr S.PtrDeRef n _)
+    = emitExprForValue n -- n evaluates to pointer
 
 emitExprForValue :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExprForValue e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
