@@ -17,7 +17,10 @@ prefix symbol func
 binary symbol func
     = E.Infix (operator symbol >> return (\a b -> BinOpExpr func a b ()))
 
-table = [ [ prefix "#" ArrayLen ]
+table = [ [ binary "."  MemberOf E.AssocLeft
+          , binary "->" DeRefMemberOf E.AssocLeft
+          ]
+        , [ prefix "#" ArrayLen ]
         , [ prefix "not" LogNot ]
         , [ prefix "@" ValRef ]
         , [ prefix "$" PtrDeRef ]
@@ -67,7 +70,7 @@ typePointer = do
     return $ TypePointer ty
 
 typeAnonTuple :: Parser Type
-typeAnonTuple = M.liftM (TypeTuple "") $ parens $ commaSep typeDecl
+typeAnonTuple = M.liftM (TypeTuple "" . map (Field "")) $ parens $ commaSep typeDecl
 
 typeUnknow :: Parser Type
 typeUnknow = do

@@ -8,12 +8,15 @@ data Operation
     | LogNot                         -- logical not
     | Eq | Neq | Lt | Lte | Gt | Gte -- comparison
     | ArrayLen                       -- array lenght
-    | ValRef | PtrDeRef              -- value dereference and pointer reference
+    | ValRef | PtrDeRef              -- value reference and pointer drreference
+    | MemberOf | DeRefMemberOf       -- . and ->
     deriving (Eq, Ord, Show)
 
 data BindingKind = Immutable | Mutable deriving (Eq, Ord, Show)
 
 type BitCount = Int
+
+data TupleFiled = Field Name Type deriving (Eq, Ord, Show)
 
 data Type = TypeFloating BitCount
           | TypeInteger BitCount
@@ -22,7 +25,7 @@ data Type = TypeFloating BitCount
           | TypeArray Type
           | TypePointer Type
           | TypeFunction [Type] Type
-          | TypeTuple Name [Type]
+          | TypeTuple Name [TupleFiled]
           | TypeUnknow Name
           deriving (Eq, Ord, Show)
 

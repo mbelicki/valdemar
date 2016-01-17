@@ -14,8 +14,10 @@ import qualified LLVM.General.Module as LLVM.Module
 
 import qualified Control.Monad.Except as Except
 import qualified Control.Monad as M
-import qualified Data.Map as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.List as List
 import qualified Data.Word as Word
+import qualified Data.Map as Map
 import qualified Data.Int as Int
 
 arrayIndexType :: LLVM.Type
@@ -30,8 +32,8 @@ getLLVMType (S.TypeArray ty)
     = LLVM.StructureType False 
         [arrayIndexType, LLVM.ArrayType 0 $ getLLVMType ty] 
 
-getLLVMType (S.TypeTuple _ tys)
-    = LLVM.StructureType False $ map getLLVMType tys
+getLLVMType (S.TypeTuple _ fields)
+    = LLVM.StructureType False $ map (\(S.Field _ ty) -> getLLVMType ty) fields
 
 getLLVMType (S.TypePointer ty)
     = LLVM.PointerType (getLLVMType ty) (LLVM.Addr.AddrSpace 0)
@@ -73,14 +75,14 @@ generateCommonDecls =
     CG.external (getLLVMType S.TypeUnit) "bounds_check_failed" []
 
 emitStatement :: S.Statement S.Type -> CG.CodeGenerator ()
-emitStatement (S.ExpressionStmt n) = M.void $ emitExpression n
-emitStatement (S.ReturnStmt n) = M.void $ emitExpression n >>= CG.ret
+emitStatement (S.ExpressionStmt n) = M.void $ emitExprForValue n
+emitStatement (S.ReturnStmt n) = M.void $ emitExprForValue n >>= CG.ret
 emitStatement (S.BlockStmt n) = M.forM_ n emitStatement
 emitStatement (S.IfStmt cond body) = do
     thenBlock <- CG.addBlock "if.then"
     endBlock  <- CG.addBlock "if.end"
 
-    condOp <- emitExpression cond
+    condOp <- emitExprForValue cond
     CG.condBr condOp thenBlock endBlock
 
     CG.setBlock thenBlock
@@ -100,7 +102,7 @@ emitStatement (S.WhileStmt cond body) = do
     CG.br beginBlock
     CG.setBlock beginBlock
 
-    condOp <- emitExpression cond
+    condOp <- emitExprForValue cond
     CG.condBr condOp bodyBlock endBlock
 
     CG.setBlock bodyBlock
@@ -113,20 +115,19 @@ emitStatement (S.WhileStmt cond body) = do
     return ()
 
 emitStatement (S.AssignmentStmt (S.VarExpr name _) n) = do
-    op <- emitExpression n
+    op <- emitExprForValue n
     var <- CG.getLocal name
     CG.store var op
     return ()
 
 emitStatement (S.AssignmentStmt (S.PrefixOpExpr S.PtrDeRef (S.VarExpr name _) _) n) = do
-    op <- emitExpression n
-    var <- CG.getLocal name
-    ptr <- CG.load var
+    op <- emitExprForValue n
+    ptr <- CG.getLocal name >>= CG.load
     CG.store ptr op
     return ()
 
 emitStatement (S.AssignmentStmt e@(S.ElementOfExpr{}) n) = do
-    op <- emitExpression n
+    op <- emitExprForValue n
     var <- getElementPtr e
     CG.store var op
     return ()
@@ -200,20 +201,26 @@ getAddress valueOp = do
 getValue :: LLVM.Operand -> CG.CodeGenerator LLVM.Operand
 getValue = CG.load
 
-emitExpression :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
-emitExpression e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
-emitExpression e@(S.IntegerExpr n ty) = M.liftM CG.const $ emitConstant e
-emitExpression e@(S.BooleanExpr n ty) = M.liftM CG.const $ emitConstant e
-emitExpression (S.VarExpr n ty) = CG.getLocal n >>= CG.load
-emitExpression (S.ValDeclExpr (S.ValBind kind name typeName) n ty) = do
-    op <- emitExpression n
+emitExprForAddress :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand 
+emitExprForAddress (S.VarExpr n _) = CG.getLocal n
+emitExprForAddress n@(S.ValDeclExpr (S.ValBind _ name _) _ _) = do
+    op <- emitExprForValue n
+    CG.getLocal name
+
+emitExprForValue :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
+emitExprForValue e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
+emitExprForValue e@(S.IntegerExpr n ty) = M.liftM CG.const $ emitConstant e
+emitExprForValue e@(S.BooleanExpr n ty) = M.liftM CG.const $ emitConstant e
+emitExprForValue (S.VarExpr n ty) = CG.getLocal n >>= CG.load
+emitExprForValue (S.ValDeclExpr (S.ValBind kind name typeName) n ty) = do
+    op <- emitExprForValue n
     ptr <- CG.alloca $ getLLVMType typeName
     CG.store ptr op
     CG.assignLocal name ptr
     return op
 
-emitExpression (S.ValDestructuringExpr bindings n ty) = do
-    op <- emitExpression n
+emitExprForValue (S.ValDestructuringExpr bindings n ty) = do
+    op <- emitExprForValue n
     ptr <- CG.alloca $ getLLVMType ty
     CG.store ptr op
     -- index bindings
@@ -229,25 +236,44 @@ emitExpression (S.ValDestructuringExpr bindings n ty) = do
         CG.assignLocal name varPtr
     return op
 
-emitExpression (S.PrefixOpExpr S.ValRef (S.VarExpr name _) _)
+emitExprForValue (S.PrefixOpExpr S.ValRef (S.VarExpr name _) _)
     = CG.getLocal name
 
-emitExpression (S.PrefixOpExpr S.ValRef a ty)
+emitExprForValue (S.PrefixOpExpr S.ValRef a ty)
     = error $ "Cannot derefernece: " ++ show a
 
-emitExpression (S.PrefixOpExpr op a ty)
+emitExprForValue (S.PrefixOpExpr op a ty)
     = case Map.lookup op unaryOperators of
         Nothing -> error $ "Operator is missing: " ++ show op ++ ", " ++ show ty
         Just instr -> do
-            opA <- emitExpression a
+            opA <- emitExprForValue a
             instr opA
 
-emitExpression (S.BinOpExpr op a b ty)
+emitExprForValue (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
+    tuplePtr <- emitExprForAddress n
+
+    let S.TypeTuple tupleName fields = S.tagOfExpr n
+        maybeOffset = getFieldOffset fields name
+
+    M.unless (Maybe.isJust maybeOffset) $ error $ "Tuple: '" ++ tupleName 
+        ++ "' does not contain field: '" ++ name ++ "'"
+
+    let Just rawOffset = maybeOffset
+        offset      = CG.const $ LLVM.Const.Int 32 0
+        fieldOffset = CG.const $ LLVM.Const.Int 32 $ fromIntegral rawOffset
+
+    memberPtr <- CG.getElementPtr tuplePtr [offset, fieldOffset]
+    CG.load memberPtr
+  where
+    getFieldOffset :: [S.TupleFiled] -> S.Name -> Maybe Int
+    getFieldOffset fields name = List.findIndex (\(S.Field nm _) -> nm == name) fields
+
+emitExprForValue (S.BinOpExpr op a b ty)
     = case Map.lookup (op, isInt (S.tagOfExpr a)) binaryOperators of
         Nothing -> error $ "Operator is missing: " ++ show op ++ ", " ++ show ty
         Just instr -> do
-            opA <- emitExpression a
-            opB <- emitExpression b
+            opA <- emitExprForValue a
+            opB <- emitExprForValue b
             instr opA opB
         where
             isInt :: S.Type -> Bool
@@ -255,19 +281,19 @@ emitExpression (S.BinOpExpr op a b ty)
             isInt (S.TypeBoolean) = True
             isInt _ = False
 
-emitExpression (S.CastExpr ty n _) = do 
+emitExprForValue (S.CastExpr ty n _) = do 
     let innerType = S.tagOfExpr n
-    op <- emitExpression n
+    op <- emitExprForValue n
     convert innerType ty op
 
-emitExpression (S.CallExpr fun args ty) = do
-    argSymbols <- M.mapM emitExpression args
+emitExprForValue (S.CallExpr fun args ty) = do
+    argSymbols <- M.mapM emitExprForValue args
     let retType = getLLVMType ty
         funSybmol = CG.global retType $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
-emitExpression (S.AnonTupleExpr ns ty) = do
-    ops <- M.forM ns $ \n -> emitExpression n
+emitExprForValue (S.AnonTupleExpr ns ty) = do
+    ops <- M.forM ns $ \n -> emitExprForValue n
     -- allocate temporary struct
     ptr <- CG.alloca $ getLLVMType ty
     -- index operands
@@ -280,7 +306,7 @@ emitExpression (S.AnonTupleExpr ns ty) = do
         CG.store memberPtr op
     CG.load ptr
 
-emitExpression (S.ArrayExpr ns ty) = do
+emitExprForValue (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n
     let arrayConst = LLVM.Const.Array llvmType consts
         countConst = LLVM.Const.Int 32 (toInteger $ length ns)
@@ -297,11 +323,11 @@ emitExpression (S.ArrayExpr ns ty) = do
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
-emitExpression e@(S.ElementOfExpr{}) = getElementPtr e >>= CG.load
+emitExprForValue e@(S.ElementOfExpr{}) = getElementPtr e >>= CG.load
  
 getElementPtr :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 getElementPtr (S.ElementOfExpr name index ty) = do
-    indexOp <- emitExpression index
+    indexOp <- emitExprForValue index
     arrayOp <- CG.getLocal name >>= CG.load
 
     let offset      = CG.const $ LLVM.Const.Int 32 0

@@ -172,21 +172,21 @@ fn vec3_print(a vec3_t) -> unit_t {
     print_float(z)
 }
 
-fn fill_with_zeros(a ^vec3_t) -> unit_t {
+fn fill_with_zeros(!a ^vec3_t) -> unit_t {
     $a = (0.0, 0.0, 0.0)
 }
 
 fn structs () -> unit_t {
-    val position vec3_t = (0.0, 1.0, 2.0)
-    --val target vec3_t = zeros()
-    --val up vec3_t = ones()
-
-    --val vec vec3_t = val (x, y, z double_t) = vec3_add(position, up)
-    --vec3_print(vec)
+    val !position vec3_t = (0.0, 1.0, 2.0)
     
-    val pos ^vec3_t = @position
+    val !pos ^vec3_t = @position
     fill_with_zeros(pos)
-    vec3_print($pos)
+    vec3_print(position)
+
+    $pos = (0.0, 1.0, 2.0)
+    if position.x + 1.0 == position.y {
+        print("member access seems to work")
+    }
 }
 
 fn arg_packs (a, b, c double_t) -> double_t {

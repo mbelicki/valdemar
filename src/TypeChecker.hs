@@ -107,15 +107,28 @@ findDecl name = do
         maybeGlobal = findDeclInScope globalScope name
     return $ if Maybe.isJust maybeLocal then maybeLocal else maybeGlobal
 
+
 assertType :: S.Type -> S.Type -> String -> TypeChecker ()
-assertType (S.TypeTuple _ exp_tys) (S.TypeTuple _ act_tys) message
-    = when (exp_tys /= act_tys) $ error message
 assertType (S.TypePointer exp_ty) (S.TypePointer act_ty) message
     = assertType exp_ty act_ty message
+
+assertType (S.TypeTuple exp_name exp_fs) (S.TypeTuple act_name act_fs) message
+    = unless compatible $ error message
+  where
+    nameCompatible = exp_name == "" || act_name == "" || exp_name == act_name
+    stripFiledNames = map (\(S.Field _ t) -> t)
+    fieldsCompatible = stripFiledNames exp_fs == stripFiledNames act_fs
+
+    compatible = nameCompatible && fieldsCompatible
+
 assertType expected actual message
     = when (expected /= actual) $ error $ message ++ explanation
         where
             explanation = " expected: " ++ show expected ++ " found: " ++ show actual
+
+isTuple :: S.Type -> Bool
+isTuple (S.TypeTuple _ _) = True
+isTuple _ = False
 
 -- entry point:
 
@@ -141,8 +154,8 @@ findGlobals s = buildScope decls aliases
         funcToDecl (S.ExtFunDeclExpr d _ ) = Just $ getDecl d
         funcToDecl _ = Nothing
 
-        fieldsToTypes :: [S.ValueBinding] -> [S.Type]
-        fieldsToTypes = map (\(S.ValBind _ _ t) -> t)
+        fieldsToTypes :: [S.ValueBinding] -> [S.TupleFiled]
+        fieldsToTypes = map (\(S.ValBind _ n t) -> S.Field n t)
 
         tupleToAlias :: S.Expression a -> Maybe TypeAlias
         tupleToAlias (S.NamedTupleDeclExpr name fileds _)
@@ -221,7 +234,7 @@ transformExpression (S.ArrayExpr rawItems _) = do
 -- tuple literal:
 transformExpression (S.AnonTupleExpr rawItems _) = do
     items <- M.forM rawItems transformExpression
-    let types     = map S.tagOfExpr items
+    let types     = map (S.Field "" . S.tagOfExpr) items
         tupleType = S.TypeTuple "" types
     return $ S.AnonTupleExpr items tupleType
 
@@ -236,6 +249,29 @@ transformExpression (S.PrefixOpExpr op arg _) = do
     getOpType op (S.TypePointer ty) | op `elem` [S.PtrDeRef] = ty
     getOpType _ argType = argType
 
+transformExpression (S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
+    typed <- transformExpression arg
+    ty <- resolveType $ S.tagOfExpr typed
+
+    unless (isTuple ty) $ error $ "Cannot access member of: '" 
+        ++ show arg ++ "', expression is not a tuple."
+    
+    let S.TypeTuple tupleName fields = ty
+        maybeField = findField fields name
+
+    unless (Maybe.isJust maybeField) $ error $ "Tuple '" ++ tupleName 
+        ++ "' does not contain field: '" ++ name ++ "'"
+
+    let Just (S.Field fName fType) = maybeField
+    
+    return $ S.BinOpExpr S.MemberOf typed (S.VarExpr name fType) fType
+  where
+    findField :: [S.TupleFiled] -> S.Name -> Maybe S.TupleFiled
+    findField fields name = find (\(S.Field nm _) -> nm == name) fields
+
+transformExpression (S.BinOpExpr S.MemberOf argA argB _)
+    = error $ "Cannot use: '" ++ show argB ++ "' as subscript to: '" ++ show argA ++ "'"
+
 transformExpression (S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
     typedB <- transformExpression argB
@@ -245,7 +281,7 @@ transformExpression (S.BinOpExpr op argA argB _) = do
     return $ S.BinOpExpr op typedA typedB opType
   where
     getOpType :: S.Operation -> S.Type -> S.Type
-    getOpType op _ | op `elem` [S.Eq, S.Neq, S.Lt, S.Lte, S.Gt, S.Gte, S.LogNot] = S.TypeBoolean
+    getOpType op _ | op `elem` [S.Eq, S.Neq, S.Lt, S.Lte, S.Gt, S.Gte] = S.TypeBoolean
     getOpType _ argType = argType
 
 -- based on defined symbols:
@@ -310,10 +346,12 @@ transformExpression (S.ValDestructuringExpr bindings rawValue _) = do
     otherTy <- resolveType $ S.tagOfExpr typedValue
 
     resolvedBindings <- M.mapM resolveBinding bindings
-    let packedType = S.TypeTuple "" (map (\(S.ValBind _ _ t) -> t) resolvedBindings)
+    let packedType = S.TypeTuple "" (map (\(S.ValBind _ n t) -> S.Field n t) resolvedBindings)
     
-    let names = foldr (\a b -> b ++ show a) "" resolvedBindings
+    let names = foldr (\a b -> b ++ show a ++ ", ") "" resolvedBindings
         message = "In destructuring binding of (" ++ names ++ ")"
+                    ++ "expected: '" ++ show packedType 
+                    ++ "' actual type: '" ++ show otherTy ++ "'"
     assertType packedType otherTy message
 
     M.forM_ resolvedBindings $ \(S.ValBind _ name ty) -> addLocalDecl (name, ty)
