@@ -28,12 +28,15 @@ getLLVMType (S.TypeFloating n) = LLVM.FloatingPointType (fromIntegral n) LLVM.IE
 getLLVMType (S.TypeInteger n) = LLVM.IntegerType (fromIntegral n)
 getLLVMType  S.TypeBoolean = LLVM.IntegerType 1
 getLLVMType  S.TypeUnit = LLVM.VoidType
+getLLVMType (S.TypeUnknow name) = LLVM.NamedTypeReference $ LLVM.Name name
 getLLVMType (S.TypeArray ty)
     = LLVM.StructureType False 
         [arrayIndexType, LLVM.ArrayType 0 $ getLLVMType ty] 
 
-getLLVMType (S.TypeTuple _ fields)
-    = LLVM.StructureType False $ map (\(S.Field _ ty) -> getLLVMType ty) fields
+getLLVMType (S.TypeTuple name fields)
+    = if name /= ""
+      then LLVM.NamedTypeReference $ LLVM.Name name
+      else LLVM.StructureType False $ map (\(S.Field _ ty) -> getLLVMType ty) fields
 
 getLLVMType (S.TypePointer ty)
     = LLVM.PointerType (getLLVMType ty) (LLVM.Addr.AddrSpace 0)
@@ -67,7 +70,11 @@ generateSingleDef (S.ExtFunDeclExpr (S.FunDecl name args retType) ty) = do
     let llvmType = getLLVMType retType
     CG.external llvmType name funArgs
 
-generateSingleDef (S.NamedTupleDeclExpr{}) = return ()
+generateSingleDef (S.NamedTupleDeclExpr name fileds _)
+    = CG.declareType name $ getLLVMType $ S.TypeTuple "" $ fieldsToTypes fileds
+  where
+    fieldsToTypes :: [S.ValueBinding] -> [S.TupleFiled]
+    fieldsToTypes = map (\(S.ValBind _ n t) -> S.Field n t)
     
 
 generateCommonDecls :: CG.ModuleBuilder ()
@@ -164,6 +171,8 @@ conversions = Map.fromList
     ]
 
 convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+convert t@(S.TypeTuple _ _) (S.TypeTuple _ _) op
+    = CG.bitcast op (getLLVMType t)
 convert innerType outerType op
     = case Map.lookup (innerType, outerType) conversions of
         Nothing -> error $ "Conversion is missing: " 

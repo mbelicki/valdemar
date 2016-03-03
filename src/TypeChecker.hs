@@ -5,9 +5,11 @@ module TypeChecker
     ) where
 
 import qualified Syntax as S
+import qualified Fault as F
 
 import Control.Monad as M
 import Control.Monad.State
+import Control.Monad.Except
 import Control.Applicative
 
 import Data.Maybe as Maybe
@@ -29,6 +31,7 @@ data CheckerState
     = CheckerState
         { checkerGlobalScope :: Scope
         , checkerLocalScope :: Scope
+        , checkerFaults :: [F.Fault]
         }
 
 newtype TypeChecker a = TypeChecker { runTypeChecker :: State CheckerState a }
@@ -38,7 +41,7 @@ emptyScope :: Scope
 emptyScope = Scope [] [] Nothing
 
 emptyChecker :: CheckerState
-emptyChecker = CheckerState emptyScope emptyScope
+emptyChecker = CheckerState emptyScope emptyScope []
 
 executeChecker :: TypeChecker a -> a
 executeChecker tc = evalState (runTypeChecker tc) emptyChecker
@@ -69,6 +72,11 @@ findInScope getter scope name
 
 -- cheker state operations:
 
+addFault :: F.Fault -> TypeChecker ()
+addFault f = do
+    fs <- gets checkerFaults
+    modify $ \s -> s { checkerFaults = f : fs }
+
 getGlobals :: TypeChecker Scope
 getGlobals = gets checkerGlobalScope
 
@@ -77,12 +85,12 @@ getLocals = gets checkerLocalScope
 
 addGlobalDecl :: Decl -> TypeChecker ()
 addGlobalDecl d = do
-    globals <- M.liftM (appendDecl d) getGlobals 
+    globals <- fmap (appendDecl d) getGlobals 
     modify $ \s -> s { checkerGlobalScope = globals }
 
 addLocalDecl :: Decl -> TypeChecker ()
 addLocalDecl d = do
-    locals <- M.liftM (appendDecl d) getLocals
+    locals <- fmap (appendDecl d) getLocals
     modify $ \s -> s { checkerLocalScope = locals }
 
 pushScope :: TypeChecker ()
@@ -93,7 +101,7 @@ pushScope = do
 
 popScope :: TypeChecker (Maybe Scope)
 popScope = do
-    maybeParent <- M.liftM scopeParent getLocals
+    maybeParent <- fmap scopeParent getLocals
     case maybeParent of
         Nothing    -> modify $ \s -> s { checkerLocalScope = emptyScope }
         Just scope -> modify $ \s -> s { checkerLocalScope = scope }
@@ -106,27 +114,6 @@ findDecl name = do
     let maybeLocal  = findDeclInScope localScope  name
         maybeGlobal = findDeclInScope globalScope name
     return $ if Maybe.isJust maybeLocal then maybeLocal else maybeGlobal
-
-
-assertType :: S.Type -> S.Type -> String -> TypeChecker ()
-assertType (S.TypePointer exp_ty) (S.TypePointer act_ty) message
-    = assertType exp_ty act_ty message
-assertType (S.TypeArray exp_ty) (S.TypeArray act_ty) message
-    = assertType exp_ty act_ty message
-
-assertType (S.TypeTuple exp_name exp_fs) (S.TypeTuple act_name act_fs) message
-    = unless compatible $ error message
-  where
-    nameCompatible = exp_name == "" || act_name == "" || exp_name == act_name
-    stripFiledNames = map (\(S.Field _ t) -> t)
-    fieldsCompatible = stripFiledNames exp_fs == stripFiledNames act_fs
-
-    compatible = nameCompatible && fieldsCompatible
-
-assertType expected actual message
-    = when (expected /= actual) $ error $ message ++ explanation
-        where
-            explanation = " expected: " ++ show expected ++ " found: " ++ show actual
 
 isTuple :: S.Type -> Bool
 isTuple (S.TypeTuple _ _) = True
@@ -187,20 +174,69 @@ resolveType t@(S.TypeUnknow name) = do
             let Just (nm, ty) = maybeAlias
             return ty
 
-resolveType t@(S.TypeArray ty) = do
+resolveType (S.TypeArray ty) = do
     resTy <- resolveType ty
     return $ S.TypeArray resTy
 
-resolveType t@(S.TypePointer ty) = do
+resolveType (S.TypePointer ty) = do
     resTy <- resolveType ty
     return $ S.TypePointer resTy
 
-resolveType t@(S.TypeFunction args ret) = do
+resolveType (S.TypeFunction args ret) = do
     resArgs <- M.mapM resolveType args
     resRet <- resolveType ret
     return $ S.TypeFunction resArgs resRet
 
 resolveType a = return a
+
+needsCast :: S.Type -> S.Type -> Bool
+needsCast actual expected = expected /= actual
+
+canCastImplicitly :: S.Type -> S.Type -> Bool
+canCastImplicitly  S.TypeBoolean      (S.TypeInteger _)   = True
+canCastImplicitly  S.TypeBoolean      (S.TypeFloating _)  = True
+canCastImplicitly (S.TypeInteger _)   (S.TypeFloating _)  = True
+canCastImplicitly (S.TypeInteger n1)  (S.TypeInteger n2)  = n1 < n2
+canCastImplicitly (S.TypeFloating n1) (S.TypeFloating n2) = n1 < n2
+canCastImplicitly (S.TypeTuple name1 fields1) (S.TypeTuple name2 fields2) 
+    = nameCompatible && fieldsCompatible
+  where
+    nameCompatible = name1 == "" || name2 == "" || name1 == name2
+    stripFiledNames = map (\(S.Field _ t) -> t)
+    fieldsCompatible = stripFiledNames fields1 == stripFiledNames fields2
+
+canCastImplicitly _ _ = False
+
+tryImplicitCast :: S.Type -> S.Type -> Either F.Fault S.Type
+tryImplicitCast t1 t2 =
+    if not $ canCastImplicitly t1 t2 then Left fault else Right t2
+  where
+    failMsg = "Cannot cast '" ++ show t1 ++ "' to '" ++ show t2 ++ "'"
+    failCtx = "<TODO: hey implement me!>"
+    fault = F.Fault F.Error failMsg failCtx
+
+castImplicitly :: S.Type -> S.Type -> TypeChecker S.Type
+castImplicitly fromTy toTy
+    = case tryImplicitCast fromTy toTy of
+        Left fault -> do
+            addFault fault
+            return S.TypeUnit
+        Right ty -> return ty 
+
+castExprImplicitly :: S.Type -> S.Expression S.Type -> TypeChecker (S.Expression S.Type)
+castExprImplicitly desiredType typedExpr
+     | not castNeeded = return typedExpr
+     | castPossible = return $ S.CastExpr desiredType typedExpr desiredType
+     | otherwise = addFault fault >> return typedExpr
+  where
+    actualType = S.tagOfExpr typedExpr
+    castNeeded = needsCast actualType desiredType
+    castPossible = canCastImplicitly actualType desiredType
+
+    failMsg = "Cannot implicitly cast: '" ++ show actualType ++ "' to '" 
+        ++ show desiredType ++ "'"
+    failCtx = "<TODO: hey implement me!>"
+    fault = F.Fault F.Error failMsg failCtx
 
 
 resolveBinding :: S.ValueBinding -> TypeChecker S.ValueBinding
@@ -275,8 +311,9 @@ transformExpression (S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
         ++ "' does not contain field: '" ++ name ++ "'"
 
     let Just (S.Field fName fType) = maybeField
+    resType <- resolveType fType
     
-    return $ S.BinOpExpr S.MemberOf typed (S.VarExpr name fType) fType
+    return $ S.BinOpExpr S.MemberOf typed (S.VarExpr name resType) resType
   where
     findField :: [S.TupleFiled] -> S.Name -> Maybe S.TupleFiled
     findField fields name = find (\(S.Field nm _) -> nm == name) fields
@@ -299,7 +336,7 @@ transformExpression (S.BinOpExpr op argA argB _) = do
 -- based on defined symbols:
 transformExpression (S.VarExpr name _) = do
     let fail = error $ "Unknown variable: " ++ name
-    decl <- M.liftM (Maybe.fromMaybe fail) $ findDecl name
+    decl <- Maybe.fromMaybe fail <$> findDecl name
     resType <- resolveType $ snd decl
     return $ S.VarExpr name resType
 
@@ -309,7 +346,7 @@ transformExpression (S.CallExpr name args _) = do
             = error $ "Mismatched argument types in call of function: " 
                         ++ name ++ " expected: " ++ show exp ++ " actual: " ++ show act
 
-    decl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
+    decl <- Maybe.fromMaybe declFail <$> findDecl name
     typedArgs <- M.forM args transformExpression
     
     actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
@@ -330,47 +367,36 @@ transformExpression (S.ElementOfExpr name index _) = do
     typedIndex <- transformExpression index
     let indexType = S.tagOfExpr typedIndex
     -- check if index has correct type
-    assertType (S.TypeInteger 64) indexType "Invalid index type"
+
+    --let castedIndex = if needsCast indexType (S.TypeInteger 64)
+    castedIndex <- castExprImplicitly (S.TypeInteger 64) typedIndex
 
     let declFail = error $ "Unknown array: " ++ name
-    arrayDecl <- M.liftM (Maybe.fromMaybe declFail) $ findDecl name
+    arrayDecl <- Maybe.fromMaybe declFail <$> findDecl name
     -- check if array declaration from current scope has correct type
     M.unless (S.isArrayPointer $ snd arrayDecl) $ error $ name ++ " is not array pointer."
     
     resType <- resolveType $ innerType $ snd arrayDecl
-    return $ S.ElementOfExpr name typedIndex resType
+    return $ S.ElementOfExpr name castedIndex resType
     where
         innerType :: S.Type -> S.Type
         innerType (S.TypePointer (S.TypeArray t)) = t
 
 transformExpression (S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
-    typedValue <- transformExpression rawValue
-    ty <- resolveType t
-    otherTy <- resolveType $ S.tagOfExpr typedValue
-    
-    let message = "In binding of '" ++ name ++ "'"
-    assertType ty otherTy message
-
-    addLocalDecl (name, ty)
-
-    return $ S.ValDeclExpr (S.ValBind kind name ty) typedValue ty
+    valueTy <- resolveType t
+    typedValue <- transformExpression rawValue >>= castExprImplicitly valueTy
+    addLocalDecl (name, valueTy)
+    return $ S.ValDeclExpr (S.ValBind kind name valueTy) typedValue valueTy
 
 transformExpression (S.ValDestructuringExpr bindings rawValue _) = do
-    typedValue <- transformExpression rawValue
-    otherTy <- resolveType $ S.tagOfExpr typedValue
-
     resolvedBindings <- M.mapM resolveBinding bindings
     let packedType = S.TypeTuple "" (map (\(S.ValBind _ n t) -> S.Field n t) resolvedBindings)
-    
-    let names = foldr (\a b -> b ++ show a ++ ", ") "" resolvedBindings
-        message = "In destructuring binding of (" ++ names ++ ")"
-                    ++ "expected: '" ++ show packedType 
-                    ++ "' actual type: '" ++ show otherTy ++ "'"
-    assertType packedType otherTy message
+
+    typedValue <- transformExpression rawValue >>= castExprImplicitly packedType
 
     M.forM_ resolvedBindings $ \(S.ValBind _ name ty) -> addLocalDecl (name, ty)
 
-    return $ S.ValDestructuringExpr resolvedBindings typedValue otherTy
+    return $ S.ValDestructuringExpr resolvedBindings typedValue packedType
 
 -- function declarations:
 transformExpression (S.FunDeclExpr funDecl stmt _) = do
@@ -381,8 +407,8 @@ transformExpression (S.FunDeclExpr funDecl stmt _) = do
     
     popScope
 
-    ty <- resolveType $ S.funDeclToType funDecl
     decl <- resolveFunDecl funDecl
+    let ty = S.funDeclToType decl
 
     return $ S.FunDeclExpr decl typedStmt ty
   where
@@ -417,25 +443,18 @@ transformStatement (S.BlockStmt rawStmts) = do
     return $ S.BlockStmt typedStmts
 
 transformStatement (S.IfStmt rawCondition rawBody) = do
-    typedCondition <- transformExpression rawCondition
-    assertType S.TypeBoolean (S.tagOfExpr typedCondition) "If condtition expression:"
-
+    typedCondition <- transformExpression rawCondition >>= castExprImplicitly S.TypeBoolean
     typedBody <- transformStatement rawBody
     return $ S.IfStmt typedCondition typedBody
 
 transformStatement (S.WhileStmt rawCondition rawBody) = do
-    typedCondition <- transformExpression rawCondition
-    assertType S.TypeBoolean (S.tagOfExpr typedCondition) "While condtition expression:"
-
+    typedCondition <- transformExpression rawCondition >>= castExprImplicitly S.TypeBoolean
     typedBody <- transformStatement rawBody
     return $ S.WhileStmt typedCondition typedBody
 
 transformStatement (S.AssignmentStmt rawLhs rawRhs) = do
     -- TODO: check if lhs is valid lhs expression
     lhs <- transformExpression rawLhs
-    rhs <- transformExpression rawRhs
-
-    assertType (S.tagOfExpr lhs) (S.tagOfExpr rhs) "Cannot assign, incompatible types."
-
+    rhs <- transformExpression rawRhs >>= castExprImplicitly (S.tagOfExpr lhs)
     return $ S.AssignmentStmt lhs rhs
     

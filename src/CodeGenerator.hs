@@ -64,6 +64,9 @@ addDef d = do
 makeParam :: Argument -> LLVM.Parameter
 makeParam (t, n, _) = LLVM.Parameter t n []
 
+declareType :: String -> LLVM.Type -> ModuleBuilder ()
+declareType name ty = addDef $ LLVM.TypeDefinition (LLVM.Name name) (Just ty)
+
 define :: LLVM.Type -> String -> [Argument] -> [LLVM.BasicBlock] -> ModuleBuilder ()
 define returnType label arguments body
     = addDef $ LLVM.GlobalDefinition $ LLVM.functionDefaults
@@ -161,7 +164,7 @@ currentBlock
 newLocalName :: CodeGenerator Word
 newLocalName
     = do
-        nextIndex <- M.liftM (+ 1) $ gets generatorCount
+        nextIndex <- (+ 1) <$> gets generatorCount
         modify $ \s -> s { generatorCount = nextIndex }
         return nextIndex
 

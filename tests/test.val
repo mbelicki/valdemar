@@ -209,8 +209,19 @@ fn arg_packs (a, b, c double_t) -> double_t {
     return a + b * c
 }
 
+tuple pair_t {
+    v1, v2 vec3_t
+}
+
+fn embedded_structs() -> unit_t {
+    --val pair pair_t = ((1.0, 0.0, 0.0), zeros())
+    --vec3_print(pair.v1)
+    --vec3_print(pair.v2)
+}
+
 fn main () -> unit_t {
-    array_assignment()
-    structs()
+    -- array_assignment()
+    -- structs()
+    embedded_structs()
 }
 

@@ -7,7 +7,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Mateusz Belicki 
 maintainer:          _@belickim.net
-copyright:           2015 Mateusz Belicki
+copyright:           2016 Mateusz Belicki
 category:            Compiler
 build-type:          Simple
 cabal-version:       >=1.10
