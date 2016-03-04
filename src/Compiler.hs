@@ -31,10 +31,12 @@ import qualified LLVM.General.Module as LLVM.Module
 import qualified Control.Monad as M
 import qualified Data.Maybe as Maybe
 import qualified Data.List as List
+import qualified Data.Char as Char
 import qualified Data.Map as Map
 
 import qualified System.Directory as Dir
 import qualified System.Process as Proc
+import qualified System.Exit as Exit
 
 data OutputType = OutExecutable
                 | OutObjectFile
@@ -139,20 +141,33 @@ transformAst ast = do
     -- TODO: other transformations here
     return checked
 
+applyControlCodes :: String -> String -> String
+applyControlCodes code string = "\x1b" ++ code ++ string ++ "\x1b[0m"
+
+showFaultLevel :: F.FaultLevel -> Bool -> String
+showFaultLevel level useColor
+    = if useColor then applyControlCodes colorCode name else name
+  where
+    name = map Char.toLower $ show level
+    colorCode = case level of
+        F.Error -> "[31;1m"
+        F.Warning -> "[33;1m"
+
 printFaults :: [F.Fault] -> IO ()
 printFaults faults = M.forM_ faults $ \(F.Fault kind msg ctx) -> do
-    putStr $ "[" ++ show kind ++ "]: "
-    putStrLn msg
+    putStr $ "[" ++ showFaultLevel kind True ++ "]: "
+    putStrLn $ applyControlCodes "[1m" msg
     putStrLn ctx
     putStrLn ""
 
-compileAst :: ([S.Expression S.Type] -> IO a) -> F.MaybeAst S.Type -> IO ()
-compileAst _ (Left faults) = printFaults faults
+compileAst :: ([S.Expression S.Type] -> IO a) -> F.MaybeAst S.Type -> IO Bool
+compileAst _ (Left faults) = printFaults faults >> return False
 compileAst compile (Right (ast, faults)) = do 
     printFaults faults
     M.void $ compile ast
+    return True
 
-buildSource :: String -> CompilerOptions -> IO ()
+buildSource :: String -> CompilerOptions -> IO Bool
 buildSource filePath options = do
     exists <- Dir.doesFileExist filePath
     if exists
@@ -162,8 +177,12 @@ buildSource filePath options = do
                 Right ast -> do 
                     M.when verbose $ putStrLn compileMessage
                     compileAst (E.generate format moduleName outPath) $ transformAst ast
-                Left err -> putStrLn $ "Parsing error: " ++ show err
-        else putStrLn $ "File: '" ++ filePath ++ "' could not be open. Skipping."
+                Left err -> do 
+                    putStrLn $ "Parsing error: " ++ show err
+                    return False
+        else do 
+            putStrLn $ "File: '" ++ filePath ++ "' could not be open." 
+            return False
     where
         verbose = compilerVerbose options
         -- get output type from options, if building executable compile each
@@ -193,11 +212,17 @@ compile options files = do
     let sources = filterPathsByType ValdemarSource files
     let objects = filterPathsByType ObjectFile files
 
-    M.forM_ sources $ \file ->
+    results <- M.forM sources $ \file ->
         buildSource file options
 
-    M.when (outputType == OutExecutable) $ do
+    let somethingFailed = False `elem` results
+
+    M.when (outputType == OutExecutable && not somethingFailed) $ do
         let allObjects = objects ++ map (++ ".o") sources
         let outName = compilerOutputName options
         linkAll outName allObjects
+
+    M.when (outputType == OutExecutable && somethingFailed) $ do
+        putStrLn "Compilation failed."
+        Exit.exitFailure
 

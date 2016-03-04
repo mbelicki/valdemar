@@ -233,7 +233,7 @@ castExprImplicitly desiredType typedExpr
 
     failMsg = "Cannot implicitly cast: '" ++ show actualType ++ "' to '" 
         ++ show desiredType ++ "'"
-    failCtx = "<TODO: hey implement me!>"
+    failCtx = "In expression: '" ++ show typedExpr ++ "'"
     fault = F.Fault F.Error failMsg failCtx
 
 
