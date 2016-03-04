@@ -338,8 +338,18 @@ transformExpression (S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
     findField :: [S.TupleFiled] -> S.Name -> Maybe S.TupleFiled
     findField fields name = find (\(S.Field nm _) -> nm == name) fields
 
-transformExpression (S.BinOpExpr S.MemberOf argA argB _)
-    = error $ "Cannot use: '" ++ show argB ++ "' as subscript to: '" ++ show argA ++ "'"
+transformExpression e@(S.BinOpExpr S.MemberOf argA argB _) = do
+    stmt <- getLastStatement
+    let failMsg = "Cannot use: '" ++ show argB 
+            ++ "' as subscript to: '" ++ show argA ++ "'"
+        failCtx = "In expression: " ++ show e ++ "\n"
+            ++ "In statement: " ++ show stmt
+    addFault $ F.Fault F.Error failMsg failCtx
+    -- check any way, perhaps there are some more issues to report:
+    typedArgA <- transformExpression argA
+    typedArgB <- transformExpression argB
+    
+    return $ S.BinOpExpr S.MemberOf typedArgA typedArgB S.TypeUnit   
 
 transformExpression (S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
@@ -360,7 +370,9 @@ transformExpression (S.VarExpr name _) = do
     resType <- resolveType $ snd decl
     return $ S.VarExpr name resType
 
-transformExpression (S.CallExpr name args _) = do
+transformExpression e@(S.CallExpr name args _) = do
+    stmt <- getLastStatement
+
     let declFail = error $ "Unknown function: " ++ name
         argTypeFail exp act 
             = error $ "Mismatched argument types in call of function: " 
@@ -372,16 +384,25 @@ transformExpression (S.CallExpr name args _) = do
     actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
     expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
 
-    unless (actualArgTypes == expectedArgTypes) $ argTypeFail expectedArgTypes actualArgTypes
+    unless (actualArgTypes == expectedArgTypes) $
+        addFault $ makeArgTypeFault expectedArgTypes actualArgTypes stmt
 
     resType <- resolveType $ getReturnType $ snd decl
     return $ S.CallExpr name typedArgs resType
-    where
-        getReturnType :: S.Type -> S.Type
-        getReturnType (S.TypeFunction _ ret) = ret
+  where
+    getReturnType :: S.Type -> S.Type
+    getReturnType (S.TypeFunction _ ret) = ret
 
-        getArgTypes :: S.Type -> [S.Type]
-        getArgTypes (S.TypeFunction args _) = args
+    getArgTypes :: S.Type -> [S.Type]
+    getArgTypes (S.TypeFunction args _) = args
+
+    failArgTypeMsg = "Mismatched argument types in call of function: " ++ name
+    failArgTypeCtx exp act s = "Expected types: " ++ show exp ++ "\n"
+                            ++ "Actual type:    " ++ show act ++ "\n"
+                            ++ "In expression: " ++ show e ++ "\n"
+                            ++ "In statement: " ++ show s
+    makeArgTypeFault exp act s 
+        = F.Fault F.Error failArgTypeMsg $ failArgTypeCtx exp act s
 
 transformExpression (S.ElementOfExpr name index _) = do
     typedIndex <- transformExpression index
