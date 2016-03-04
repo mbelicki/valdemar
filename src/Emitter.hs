@@ -163,22 +163,6 @@ unaryOperators = Map.fromList
     , (S.PtrDeRef, getValue)
     ]
 
-conversions = Map.fromList
-    [ ((S.TypeFloating 64, S.TypeInteger 64), CG.fptosi)
-    , ((S.TypeInteger 64, S.TypeFloating 64), CG.sitofp)
-    , ((S.TypeInteger 8,  S.TypeInteger 64), CG.zext)
-    , ((S.TypeInteger 64, S.TypeInteger 8), CG.trunc)
-    ]
-
-convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
-convert t@(S.TypeTuple _ _) (S.TypeTuple _ _) op
-    = CG.bitcast op (getLLVMType t)
-convert innerType outerType op
-    = case Map.lookup (innerType, outerType) conversions of
-        Nothing -> error $ "Conversion is missing: " 
-            ++ show innerType ++ " to " ++ show outerType
-        Just instr -> instr (getLLVMType outerType) op
-
 getArrayLenght :: LLVM.Operand -> CG.CodeGenerator LLVM.Operand
 getArrayLenght arrayOp = do
     let offset      = CG.const $ LLVM.Const.Int 32 0
@@ -204,6 +188,20 @@ emitExprForAddress n@(S.ValDeclExpr (S.ValBind _ name _) _ _) = do
     CG.getLocal name
 emitExprForAddress (S.PrefixOpExpr S.PtrDeRef n _)
     = emitExprForValue n -- n evaluates to pointer
+
+emitExprForAddress (S.AnonTupleExpr ns ty) = do
+    ops <- M.forM ns $ \n -> emitExprForValue n
+    -- allocate temporary struct
+    ptr <- CG.alloca $ getLLVMType ty
+    -- index operands
+    let indexedOps = zip [0..] ops
+    -- allocate all variables on the stack
+    M.forM_ indexedOps $ \(i, op) -> do
+        let offset       = CG.const $ LLVM.Const.Int 32 0
+            memberOffset = CG.const $ LLVM.Const.Int 32 i
+        memberPtr <- CG.getElementPtr ptr [offset, memberOffset]
+        CG.store memberPtr op
+    return ptr
 
 emitExprForAddress (S.ElementOfExpr name index ty) = do
     indexOp <- emitExprForValue index
@@ -236,7 +234,6 @@ emitExprForAddress (S.ElementOfExpr name index ty) = do
 
     CG.getElementPtr arrayOp [offset, dataOffset, indexOp]
 
-
 emitExprForAddress (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
     tuplePtr <- emitExprForAddress n
 
@@ -255,10 +252,11 @@ emitExprForAddress (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
     getFieldOffset :: [S.TupleFiled] -> S.Name -> Maybe Int
     getFieldOffset fields name = List.findIndex (\(S.Field nm _) -> nm == name) fields
 
+
 emitExprForValue :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
-emitExprForValue e@(S.FloatExpr n ty) = M.liftM CG.const $ emitConstant e
-emitExprForValue e@(S.IntegerExpr n ty) = M.liftM CG.const $ emitConstant e
-emitExprForValue e@(S.BooleanExpr n ty) = M.liftM CG.const $ emitConstant e
+emitExprForValue e@(S.FloatExpr n ty) = CG.const <$> emitConstant e
+emitExprForValue e@(S.IntegerExpr n ty) = CG.const <$> emitConstant e
+emitExprForValue e@(S.BooleanExpr n ty) = CG.const <$> emitConstant e
 emitExprForValue (S.VarExpr n ty) = CG.getLocal n >>= CG.load
 emitExprForValue (S.ValDeclExpr (S.ValBind kind name typeName) n ty) = do
     op <- emitExprForValue n
@@ -308,13 +306,34 @@ emitExprForValue (S.BinOpExpr op a b ty)
         where
             isInt :: S.Type -> Bool
             isInt (S.TypeInteger _) = True
-            isInt (S.TypeBoolean) = True
+            isInt S.TypeBoolean = True
             isInt _ = False
 
-emitExprForValue (S.CastExpr ty n _) = do 
-    let innerType = S.tagOfExpr n
+emitExprForValue (S.CastExpr targetType@(S.TypeTuple _ _) n _) = do 
+    let originalType = S.tagOfExpr n
+    op <- emitExprForAddress n
+    addr <- CG.bitcast op (getLLVMType $ S.TypePointer targetType)
+    CG.load addr
+
+emitExprForValue (S.CastExpr targetType n _) = do 
+    let originalType = S.tagOfExpr n
     op <- emitExprForValue n
-    convert innerType ty op
+    convert originalType targetType op
+  where
+    conversions = Map.fromList
+        [ ((S.TypeFloating 64, S.TypeInteger 64), CG.fptosi)
+        , ((S.TypeInteger 64, S.TypeFloating 64), CG.sitofp)
+        , ((S.TypeInteger 8,  S.TypeInteger 64), CG.zext)
+        , ((S.TypeInteger 64, S.TypeInteger 8), CG.trunc)
+        ]
+
+    convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+    convert innerType outerType op
+        = case Map.lookup (innerType, outerType) conversions of
+            Nothing -> error $ "Conversion is missing: " 
+                ++ show innerType ++ " to " ++ show outerType
+            Just instr -> instr (getLLVMType outerType) op
+
 
 emitExprForValue (S.CallExpr fun args ty) = do
     argSymbols <- M.mapM emitExprForValue args
@@ -322,19 +341,7 @@ emitExprForValue (S.CallExpr fun args ty) = do
         funSybmol = CG.global retType $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
-emitExprForValue (S.AnonTupleExpr ns ty) = do
-    ops <- M.forM ns $ \n -> emitExprForValue n
-    -- allocate temporary struct
-    ptr <- CG.alloca $ getLLVMType ty
-    -- index operands
-    let indexedOps = zip [0..] ops
-    -- allocate all variables on the stack
-    M.forM_ indexedOps $ \(i, op) -> do
-        let offset       = CG.const $ LLVM.Const.Int 32 0
-            memberOffset = CG.const $ LLVM.Const.Int 32 i
-        memberPtr <- CG.getElementPtr ptr [offset, memberOffset]
-        CG.store memberPtr op
-    CG.load ptr
+emitExprForValue expr@(S.AnonTupleExpr _ _) = CG.load =<< emitExprForAddress expr
 
 emitExprForValue (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n
@@ -353,7 +360,7 @@ emitExprForValue (S.ArrayExpr ns ty) = do
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
-emitExprForValue e@(S.ElementOfExpr{}) = emitExprForAddress e >>= CG.load
+emitExprForValue e@S.ElementOfExpr{} = emitExprForAddress e >>= CG.load
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
 emitConstant (S.FloatExpr n ty) = return $ LLVM.Const.Float (LLVM.Float.Double n)
@@ -389,7 +396,9 @@ writeOutFile format mod target file
 generate :: OutModuleFormat -> String -> String -> [S.Expression S.Type] -> IO LLVM.Module
 generate format name outPath defs =
     LLVM.Ctx.withContext $ \context ->
-        liftError $ LLVM.Targ.withHostTargetMachine $ \target ->
+        liftError $ LLVM.Targ.withHostTargetMachine $ \target -> --do
+            --print newAst
+            --putStrLn ""
             liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
                 let outFile = LLVM.Module.File outPath
                 writeOutFile format m target outFile
