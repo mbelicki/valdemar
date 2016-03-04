@@ -205,12 +205,18 @@ needsCast :: S.Type -> S.Type -> Bool
 needsCast actual expected = expected /= actual
 
 hasTheSameLayout :: S.Type -> S.Type -> Bool
+hasTheSameLayout  S.TypeBoolean S.TypeBoolean = True
+hasTheSameLayout (S.TypeInteger n1) (S.TypeInteger n2) = n1 == n2
+hasTheSameLayout (S.TypeFloating n1) (S.TypeFloating n2) = n1 == n2
 hasTheSameLayout (S.TypeArray t1) (S.TypeArray t2) = hasTheSameLayout t1 t2
 hasTheSameLayout (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
-hasTheSameLayout (S.TypeTuple _ fs1) (S.TypeTuple _ fs2) 
-    = stripFiledNames fs1 == stripFiledNames fs2
+hasTheSameLayout (S.TypeTuple _ fields1) (S.TypeTuple _ fields2) 
+    = and $ zipWith hasTheSameLayout fs1 fs2
   where
     stripFiledNames = map (\(S.Field _ t) -> t)
+    fs1 = stripFiledNames fields1
+    fs2 = stripFiledNames fields1
+
 hasTheSameLayout _ _ = False
 
 canCastImplicitly :: S.Type -> S.Type -> Bool
