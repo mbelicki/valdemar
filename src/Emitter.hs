@@ -397,9 +397,9 @@ writeOutFile format mod target file
 generate :: OutModuleFormat -> String -> String -> [S.Expression S.Type] -> IO LLVM.Module
 generate format name outPath defs =
     LLVM.Ctx.withContext $ \context ->
-        liftError $ LLVM.Targ.withHostTargetMachine $ \target -> do
-            print newAst
-            putStrLn ""
+        liftError $ LLVM.Targ.withHostTargetMachine $ \target -> --do
+            --print newAst
+            --putStrLn ""
             liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
                 let outFile = LLVM.Module.File outPath
                 writeOutFile format m target outFile

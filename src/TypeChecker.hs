@@ -197,36 +197,29 @@ resolveType a = return a
 needsCast :: S.Type -> S.Type -> Bool
 needsCast actual expected = expected /= actual
 
+hasTheSameLayout :: S.Type -> S.Type -> Bool
+hasTheSameLayout (S.TypeArray t1) (S.TypeArray t2) = hasTheSameLayout t1 t2
+hasTheSameLayout (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
+hasTheSameLayout (S.TypeTuple _ fs1) (S.TypeTuple _ fs2) 
+    = stripFiledNames fs1 == stripFiledNames fs2
+  where
+    stripFiledNames = map (\(S.Field _ t) -> t)
+hasTheSameLayout _ _ = False
+
 canCastImplicitly :: S.Type -> S.Type -> Bool
 canCastImplicitly  S.TypeBoolean      (S.TypeInteger _)   = True
 canCastImplicitly  S.TypeBoolean      (S.TypeFloating _)  = True
 canCastImplicitly (S.TypeInteger _)   (S.TypeFloating _)  = True
 canCastImplicitly (S.TypeInteger n1)  (S.TypeInteger n2)  = n1 < n2
 canCastImplicitly (S.TypeFloating n1) (S.TypeFloating n2) = n1 < n2
-canCastImplicitly (S.TypeTuple name1 fields1) (S.TypeTuple name2 fields2) 
+canCastImplicitly t1@(S.TypeTuple name1 _) t2@(S.TypeTuple name2 _) 
     = nameCompatible && fieldsCompatible
   where
     nameCompatible = name1 == "" || name2 == "" || name1 == name2
-    stripFiledNames = map (\(S.Field _ t) -> t)
-    fieldsCompatible = stripFiledNames fields1 == stripFiledNames fields2
+    fieldsCompatible = hasTheSameLayout t1 t2
 
+canCastImplicitly (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
 canCastImplicitly _ _ = False
-
-tryImplicitCast :: S.Type -> S.Type -> Either F.Fault S.Type
-tryImplicitCast t1 t2 =
-    if not $ canCastImplicitly t1 t2 then Left fault else Right t2
-  where
-    failMsg = "Cannot cast '" ++ show t1 ++ "' to '" ++ show t2 ++ "'"
-    failCtx = "<TODO: hey implement me!>"
-    fault = F.Fault F.Error failMsg failCtx
-
-castImplicitly :: S.Type -> S.Type -> TypeChecker S.Type
-castImplicitly fromTy toTy
-    = case tryImplicitCast fromTy toTy of
-        Left fault -> do
-            addFault fault
-            return S.TypeUnit
-        Right ty -> return ty 
 
 castExprImplicitly :: S.Type -> S.Expression S.Type -> TypeChecker (S.Expression S.Type)
 castExprImplicitly desiredType typedExpr
@@ -258,7 +251,8 @@ transformExpression (S.CharacterExpr v _) = return $ S.IntegerExpr (fromEnum v) 
 transformExpression (S.FloatExpr     v _) = return $ S.FloatExpr v $ S.TypeFloating 64
 transformExpression (S.CastExpr    t v _) = do 
     typedExpr <- transformExpression v
-    return $ S.CastExpr t typedExpr t
+    resolveType <- resolveType t
+    return $ S.CastExpr resolveType typedExpr resolveType
 
 -- array literal:
 transformExpression (S.ArrayExpr rawItems _) = do

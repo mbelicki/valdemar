@@ -43,7 +43,7 @@ instance Show Type where
     show TypeUnit = "unit_t"
     show (TypeArray t) = "[" ++ show t ++ "]"
     show (TypePointer t) = "^" ++ show t
-    show (TypeUnknow name) = name
+    show (TypeUnknow name) = name ++ "?"
     show (TypeFunction args ret)
         = "(" ++ argList ++ ") -> " ++ show ret
       where
