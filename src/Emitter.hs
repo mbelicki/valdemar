@@ -328,6 +328,7 @@ emitExprForValue (S.CastExpr targetType n _) = do
         ]
 
     convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
+    convert _ ty@(S.TypePointer _) op = CG.bitcast op $ getLLVMType ty
     convert innerType outerType op
         = case Map.lookup (innerType, outerType) conversions of
             Nothing -> error $ "Conversion is missing: " 
@@ -396,9 +397,9 @@ writeOutFile format mod target file
 generate :: OutModuleFormat -> String -> String -> [S.Expression S.Type] -> IO LLVM.Module
 generate format name outPath defs =
     LLVM.Ctx.withContext $ \context ->
-        liftError $ LLVM.Targ.withHostTargetMachine $ \target -> --do
-            --print newAst
-            --putStrLn ""
+        liftError $ LLVM.Targ.withHostTargetMachine $ \target -> do
+            print newAst
+            putStrLn ""
             liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
                 let outFile = LLVM.Module.File outPath
                 writeOutFile format m target outFile

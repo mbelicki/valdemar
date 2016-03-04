@@ -18,7 +18,9 @@ module Compiler
     , defaultOptions
     ) where
 
+import qualified Fault as F
 import qualified Parser as P
+import qualified Syntax as S
 import qualified Emitter as E
 import qualified TypeChecker as T
 
@@ -131,17 +133,35 @@ getModuleName pathDelimiter sourcePath
         indices -> drop index sourcePath
                     where index = 1 + last indices
 
+transformAst :: [S.Expression ()] -> F.MaybeAst S.Type
+transformAst ast = do
+    checked <- T.typeCheck ast
+    -- TODO: other transformations here
+    return checked
+
+printFaults :: [F.Fault] -> IO ()
+printFaults faults = M.forM_ faults $ \(F.Fault kind msg ctx) -> do
+    putStr $ "[" ++ show kind ++ "]: "
+    putStrLn msg
+    putStrLn ctx
+    putStrLn ""
+
+compileAst :: ([S.Expression S.Type] -> IO a) -> F.MaybeAst S.Type -> IO ()
+compileAst _ (Left faults) = printFaults faults
+compileAst compile (Right (ast, faults)) = do 
+    printFaults faults
+    M.void $ compile ast
+
 buildSource :: String -> CompilerOptions -> IO ()
 buildSource filePath options = do
     exists <- Dir.doesFileExist filePath
     if exists
         then do
-            eitherAST <- M.liftM P.parseModule $ readFile filePath
+            eitherAST <- P.parseModule <$> readFile filePath
             case eitherAST of
                 Right ast -> do 
-                    let checkedAst = T.typeCheck ast
                     M.when verbose $ putStrLn compileMessage
-                    M.void $ E.generate format moduleName outPath checkedAst
+                    compileAst (E.generate format moduleName outPath) $ transformAst ast
                 Left err -> putStrLn $ "Parsing error: " ++ show err
         else putStrLn $ "File: '" ++ filePath ++ "' could not be open. Skipping."
     where

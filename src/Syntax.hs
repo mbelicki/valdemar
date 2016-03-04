@@ -1,5 +1,7 @@
 module Syntax where
 
+import Data.List as List
+
 type Name = String
 
 data Operation 
@@ -27,7 +29,31 @@ data Type = TypeFloating BitCount
           | TypeFunction [Type] Type
           | TypeTuple Name [TupleFiled]
           | TypeUnknow Name
-          deriving (Eq, Ord, Show)
+          deriving (Eq, Ord)
+
+printFloatingType n
+    | n == 64   = "double_t"
+    | n == 32   = "float_t"
+    | otherwise = "float" ++ show n ++ "_t"
+
+instance Show Type where
+    show (TypeFloating n) = printFloatingType n
+    show (TypeInteger n) = "int" ++ show n ++ "_t"
+    show TypeBoolean = "bool_t"
+    show TypeUnit = "unit_t"
+    show (TypeArray t) = "[" ++ show t ++ "]"
+    show (TypePointer t) = "^" ++ show t
+    show (TypeUnknow name) = name
+    show (TypeFunction args ret)
+        = "(" ++ argList ++ ") -> " ++ show ret
+      where
+        argList = List.intercalate ", " $ map show args
+
+    show (TypeTuple name fields)
+        = if name /= "" then name
+          else "(" ++ fieldList ++ ")"
+      where
+        fieldList = List.intercalate ", " $ map (\(Field _ t) -> show t) fields
 
 isArray :: Type -> Bool
 isArray (TypeArray _) = True

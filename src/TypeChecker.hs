@@ -43,8 +43,13 @@ emptyScope = Scope [] [] Nothing
 emptyChecker :: CheckerState
 emptyChecker = CheckerState emptyScope emptyScope []
 
-executeChecker :: TypeChecker a -> a
-executeChecker tc = evalState (runTypeChecker tc) emptyChecker
+executeChecker :: TypeChecker a -> Either [F.Fault] (a, [F.Fault])
+executeChecker tc = if hasFailed then Left faults else Right (result, faults)
+    where
+     (result, finalState) = runState (runTypeChecker tc) emptyChecker
+     isError (F.Fault kind _ _) = kind == F.Error
+     faults = checkerFaults finalState
+     hasFailed = any isError faults
 
 -- scope operations:
 
@@ -125,7 +130,7 @@ isPointer _ = False
 
 -- entry point:
 
-typeCheck :: [S.Expression ()] -> [S.Expression S.Type]
+typeCheck :: [S.Expression ()] -> F.MaybeAst S.Type
 typeCheck = executeChecker . checkTree
 
 -- main checking method

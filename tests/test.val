@@ -1,118 +1,118 @@
 -- this is the first code ever written and compiled in valdemar
 
---fn sq (a double_t) -> double_t {
---    return a * a
---}
---
---fn add_sq (a double_t, b double_t) -> double_t {
---    return sq(a) + sq(b)
---}
---
---fn inc (a double_t) -> double_t {
---    return a + 1.0
---}
---
---ext_c sin (a double_t) -> double_t
---
---fn cos_sq (a double_t) -> double_t {
---    return 1.0 - sq(sin(a))
---}
---
---fn locals() -> double_t {
---    val pi double_t = 3.14
---    val a double_t = cos_sq(pi)
---    return a * pi * 2.0
---}
---
+fn sq (a double_t) -> double_t {
+    return a * a
+}
+
+fn add_sq (a double_t, b double_t) -> double_t {
+    return sq(a) + sq(b)
+}
+
+fn inc (a double_t) -> double_t {
+    return a + 1.0
+}
+
+ext_c sin (a double_t) -> double_t
+
+fn cos_sq (a double_t) -> double_t {
+    return 1.0 - sq(sin(a))
+}
+
+fn locals() -> double_t {
+    val pi double_t = 3.14
+    val a double_t = cos_sq(pi)
+    return a * pi * 2.0
+}
+
 ext_c print_float (a double_t) -> unit_t
---
---fn side_effects(a double_t) -> unit_t {
---    print_float(a)
---}
---
---fn booleans(a bool_t, b bool_t) -> bool_t {
---    return a | b & b
---}
---
---fn no_braces(a double_t) -> double_t return 2.0 * a
---
---fn branching (a double_t, more bool_t) -> unit_t {
---    if more {
---        print_float(a + 1.0)
---        print_float(a + 2.0)
---    }
---
---    if not more print_float(a - 1.0)
---}
---
---fn count_down(a double_t) -> unit_t {
---    if a > 0.0 {
---        print_float(a)
---        count_down(a - 1.0)
---    }
---}
---
---fn vald_fabs(a double_t) -> double_t {
---    if a < 0.0 return a * -1.0
---    return a
---}
---
---fn compare_float (a double_t, b double_t, eps double_t) -> bool_t
---    return vald_fabs(a - b) < eps
---
---fn mutability () -> unit_t {
---    val !a double_t = 0.0
---    a = a + 1.0
---    if a > 0.0 {
---        a = a + 2.0
---    }
---    print_float(a)
---}
---
---fn get_int() -> int_t return 4
---
---fn arrays () -> unit_t {
---    val arr ^[double_t] = [1.0, 2.1, 3.2]
---    val item double_t = arr[0]
---    print_float(item)
---    print_float(arr[1])
---    print_float(arr[2])
---
---    val ints ^[int_t] = [1, 2, 3]
---    val integer int_t = ints[0]
---
---    val bools ^[bool_t] = [true, false]
---    if bools[0] {
---        print_float(arr[2])
---    }
---}
---
---fn out_of_range () -> unit_t {
---    val values ^[double_t] = [1.0, 2.0, 3.0, 4.0, 5.0]
---    print_float(values[5])
---}
---
---fn count_down2 (a double_t) -> unit_t {
---    while a > 0.0 {
---        a = a - 1.0
---        print_float(a)
---    }
---}
---
+
+fn side_effects(a double_t) -> unit_t {
+    print_float(a)
+}
+
+fn booleans(a bool_t, b bool_t) -> bool_t {
+    return a | b & b
+}
+
+fn no_braces(a double_t) -> double_t return 2.0 * a
+
+fn branching (a double_t, more bool_t) -> unit_t {
+    if more {
+        print_float(a + 1.0)
+        print_float(a + 2.0)
+    }
+
+    if not more print_float(a - 1.0)
+}
+
+fn count_down(a double_t) -> unit_t {
+    if a > 0.0 {
+        print_float(a)
+        count_down(a - 1.0)
+    }
+}
+
+fn vald_fabs(a double_t) -> double_t {
+    if a < 0.0 return a * -1.0
+    return a
+}
+
+fn compare_float (a double_t, b double_t, eps double_t) -> bool_t
+    return vald_fabs(a - b) < eps
+
+fn mutability () -> unit_t {
+    val !a double_t = 0.0
+    a = a + 1.0
+    if a > 0.0 {
+        a = a + 2.0
+    }
+    print_float(a)
+}
+
+fn get_int() -> int_t return 4
+
+fn arrays () -> unit_t {
+    val arr ^[double_t] = [1.0, 2.1, 3.2]
+    val item double_t = arr[0]
+    print_float(item)
+    print_float(arr[1])
+    print_float(arr[2])
+
+    val ints ^[int_t] = [1, 2, 3]
+    val integer int_t = ints[0]
+
+    val bools ^[bool_t] = [true, false]
+    if bools[0] {
+        print_float(arr[2])
+    }
+}
+
+fn out_of_range () -> unit_t {
+    val values ^[double_t] = [1.0, 2.0, 3.0, 4.0, 5.0]
+    print_float(values[5])
+}
+
+fn count_down2 (a double_t) -> unit_t {
+    while a > 0.0 {
+        a = a - 1.0
+        print_float(a)
+    }
+}
+
 ext_c print_char (c byte_t) -> unit_t
 ext_c print_int (c int_t) -> unit_t
---
---fn strings () -> unit_t {
---    val the_best_letter byte_t = 'M'
---    print_char(the_best_letter)
---    print_char(' ')
---
---    val at_last str_t = "hello, world"
---    val the_same_as_above ^[byte_t] = "oh, hai"
---
---    print_char(at_last[0])
---}
---
+
+fn strings () -> unit_t {
+    val the_best_letter byte_t = 'M'
+    print_char(the_best_letter)
+    print_char(' ')
+
+    val at_last str_t = "hello, world"
+    val the_same_as_above ^[byte_t] = "oh, hai"
+
+    print_char(at_last[0])
+}
+
 fn print (string str_t) -> unit_t {
     val !i int_t = 0
     while i < #string {
@@ -121,23 +121,23 @@ fn print (string str_t) -> unit_t {
     }
     print_char('\n')
 }
---
---fn array_assignment () -> unit_t {
---    val hello str_t = "hello, world"
---    hello[0] = 'H'
---    print(hello)
---}
---
---fn type_conversions () -> unit_t {
---    if double_t(1 + 2) == 3.0
---        print("int_t -> double_t works.")
---    if int_t(3.2 + 2.1) == 5
---        print("double_t -> int_t works.")
---    if int_t('M') == 77
---        print("byte_t -> int_t works.")
---    if byte_t(77) == 'M'
---        print("int_t -> byte_t works.")
---}
+
+fn array_assignment () -> unit_t {
+    val hello str_t = "hello, world"
+    hello[0] = 'H'
+    print(hello)
+}
+
+fn type_conversions () -> unit_t {
+    if double_t(1 + 2) == 3.0
+        print("int_t -> double_t works.")
+    if int_t(3.2 + 2.1) == 5
+        print("double_t -> int_t works.")
+    if int_t('M') == 77
+        print("byte_t -> int_t works.")
+    if byte_t(77) == 'M'
+        print("int_t -> byte_t works.")
+}
 
 -- anonymous tuple: (double_t, double_t)
 -- named tuple:
@@ -150,21 +150,21 @@ tuple vec3_t {
     x, y, z double_t
 }
 
---fn zeros () -> (double_t, double_t, double_t) {
---    return (0.0, 0.0, 0.0)
---}
---
---fn ones () -> vec3_t {
---    val one double_t = 1.0
---    return (one, one, one)
---}
---
---fn vec3_add(a, b vec3_t) -> vec3_t {
---    val (x1, y1, z1 double_t) = a
---    val (x2, y2, z2 double_t) = b
---    return (x1 + x2, y1 + y2, z1 + z2)
---}
---
+fn zeros () -> (double_t, double_t, double_t) {
+    return (0.0, 0.0, 0.0)
+}
+
+fn ones () -> vec3_t {
+    val one double_t = 1.0
+    return (one, one, one)
+}
+
+fn vec3_add(a, b vec3_t) -> vec3_t {
+    val (x1, y1, z1 double_t) = a
+    val (x2, y2, z2 double_t) = b
+    return (x1 + x2, y1 + y2, z1 + z2)
+}
+
 fn vec3_print(a vec3_t) -> unit_t {
     val (x, y, z double_t) = a
     print_float(x)
@@ -172,44 +172,44 @@ fn vec3_print(a vec3_t) -> unit_t {
     print_float(z)
 }
 
---fn fill_with_zeros(!a ^vec3_t) -> unit_t {
---    $a = (0.0, 0.0, 0.0)
---}
+fn fill_with_zeros(!a ^vec3_t) -> unit_t {
+    $a = (0.0, 0.0, 0.0)
+}
 
 fn structs () -> unit_t {
     val !position vec3_t = (0.0, 1.0, 2.0)
     vec3_print(position)   
 
     val !pos ^vec3_t = @position
---    fill_with_zeros(pos)
+    fill_with_zeros(pos)
     vec3_print(position)
---
---    $pos = (0.0, 1.0, 2.0)
---    if position.x + 1.0 == pos->y {
---        print("member access seems to work")
---    }
---
---    pos->x = 0.5
---    position.y = 1.2
---
---    vec3_print(position)
---
---    val vectors ^[vec3_t] = [(0.0, 0.0, 0.0), (1.0, 2.0, 3.0), (0.1, 0.2, 0.3)]
---    vectors[0] = ones()
---    fill_with_zeros(@vectors[2])
---
---    print("array element 0:")
---    vec3_print(vectors[0])
---    print("array element 1:")
---    vec3_print(vectors[1])
---    print("array element 2:")
---    vec3_print(vectors[2])
+
+    $pos = (0.0, 1.0, 2.0)
+    if position.x + 1.0 == pos->y {
+        print("member access seems to work")
+    }
+
+    pos->x = 0.5
+    position.y = 1.2
+
+    vec3_print(position)
+
+    val vectors ^[vec3_t] = [(0.0, 0.0, 0.0), (1.0, 2.0, 3.0), (0.1, 0.2, 0.3)]
+    vectors[0] = ones()
+    fill_with_zeros(@vectors[2])
+
+    print("array element 0:")
+    vec3_print(vectors[0])
+    print("array element 1:")
+    vec3_print(vectors[1])
+    print("array element 2:")
+    vec3_print(vectors[2])
 }
 
---fn arg_packs (a, b, c double_t) -> double_t {
---    return a + b * c
---}
---
+fn arg_packs (a, b, c double_t) -> double_t {
+    return a + b * c
+}
+
 --tuple pair_t {
 --    v1, v2 vec3_t
 --}
