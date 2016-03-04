@@ -1,4 +1,15 @@
-module Syntax where
+module Syntax ( Name
+              , Operation(..)
+              , BindingKind(..)
+              , BitCount
+              , TupleFiled(Field)
+              , Type(..)
+              , isArray, isPointer, isArrayPointer
+              , ValueBinding(..), FunctionDeclaration(..)
+              , funDeclToType
+              , Expression(..), tagOfExpr
+              , Statement(..)
+              ) where
 
 import Data.List as List
 
@@ -36,6 +47,9 @@ printFloatingType n
     | n == 32   = "float_t"
     | otherwise = "float" ++ show n ++ "_t"
 
+showCommaSep :: Show a => [a] -> String
+showCommaSep = List.intercalate ", " . map show
+
 instance Show Type where
     show (TypeFloating n) = printFloatingType n
     show (TypeInteger n) = "int" ++ show n ++ "_t"
@@ -45,15 +59,11 @@ instance Show Type where
     show (TypePointer t) = "^" ++ show t
     show (TypeUnknow name) = name ++ "?"
     show (TypeFunction args ret)
-        = "(" ++ argList ++ ") -> " ++ show ret
-      where
-        argList = List.intercalate ", " $ map show args
-
+        = "(" ++ showCommaSep args ++ ") -> " ++ show ret
     show (TypeTuple name fields)
-        = if name /= "" then name
-          else "(" ++ fieldList ++ ")"
+        = if name /= "" then name else "(" ++ fieldsStr ++ ")"
       where
-        fieldList = List.intercalate ", " $ map (\(Field _ t) -> show t) fields
+        fieldsStr = showCommaSep $ map (\(Field _ t) -> t) fields
 
 isArray :: Type -> Bool
 isArray (TypeArray _) = True
@@ -68,7 +78,15 @@ isArrayPointer (TypePointer ty) = isArray ty
 isArrayPointer _ = False
 
 data ValueBinding
-    = ValBind BindingKind Name Type deriving (Eq, Ord, Show)
+    = ValBind BindingKind Name Type deriving (Eq, Ord)
+
+showBindingKind :: BindingKind -> String
+showBindingKind Immutable = ""
+showBindingKind Mutable = "!"
+
+instance Show ValueBinding where
+    show (ValBind k n t) = showBindingKind k ++ n ++ " " ++ show t 
+
 data FunctionDeclaration
     = FunDecl Name [ValueBinding] Type deriving (Eq, Ord, Show)
 
@@ -94,7 +112,27 @@ data Expression tag
     | NamedTupleDeclExpr Name [ValueBinding] tag
     | CallExpr Name [Expression tag] tag
     | CastExpr Type (Expression tag) tag
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+instance Show (Expression a) where
+    show (BooleanExpr b _) = if b then "true" else "false"
+    show (IntegerExpr i _) = show i
+    show (CharacterExpr c _) = "'" ++ show c ++ "'"
+    show (FloatExpr d _) = show d
+    show (ArrayExpr es _) = "[" ++ showCommaSep es ++ "]" 
+    show (AnonTupleExpr es _) = "(" ++ showCommaSep es ++ ")" 
+    show (PrefixOpExpr op e _) =  show op ++ show e
+    show (BinOpExpr op e1 e2 _) = show e1 ++ " " ++  show op ++ " " ++ show e2
+    show (ElementOfExpr n e _) = n ++ "[" ++ show e ++ "]"
+    show (VarExpr n _) = n
+    show (ValDeclExpr b e _) = "val " ++ show b ++ " = " ++ show e
+    show (ValDestructuringExpr bs e _) = "val (" ++ showCommaSep bs ++ ") = " ++ show e
+    show (FunDeclExpr decl stmt _) = "<TODO: fun decl>"
+    show (NamedTupleDeclExpr n bs _) = "<TODO: tuple decl>"
+    show (CallExpr n es _) = n ++ "(" ++ showCommaSep es ++ ")"
+    show (CastExpr t e _) = show t ++ "(" ++ show e ++ ")"
+
+    show expr = "<failed to print expression>"
 
 tagOfExpr :: Expression a -> a
 tagOfExpr (BooleanExpr _ tag) = tag
@@ -120,5 +158,13 @@ data Statement a
     | IfStmt (Expression a) (Statement a)
     | WhileStmt (Expression a) (Statement a)
     | AssignmentStmt (Expression a) (Expression a)
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+instance Show (Statement a) where
+    show (ReturnStmt e) = "return " ++ show e
+    show (ExpressionStmt e) = show e
+    show (BlockStmt stmts) = "{" ++ List.intercalate "\n" (map show stmts) ++ "}"
+    show (IfStmt cond body) = "if " ++ show cond ++ show body
+    show (WhileStmt cond body) = "while " ++ show cond ++ show body
+    show (AssignmentStmt lhs rhs) = show lhs ++ " = " ++ show rhs
 

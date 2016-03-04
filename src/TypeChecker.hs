@@ -32,6 +32,7 @@ data CheckerState
         { checkerGlobalScope :: Scope
         , checkerLocalScope :: Scope
         , checkerFaults :: [F.Fault]
+        , checkerLastStatement :: Maybe (S.Statement ())
         }
 
 newtype TypeChecker a = TypeChecker { runTypeChecker :: State CheckerState a }
@@ -41,7 +42,7 @@ emptyScope :: Scope
 emptyScope = Scope [] [] Nothing
 
 emptyChecker :: CheckerState
-emptyChecker = CheckerState emptyScope emptyScope []
+emptyChecker = CheckerState emptyScope emptyScope [] Nothing
 
 executeChecker :: TypeChecker a -> Either [F.Fault] (a, [F.Fault])
 executeChecker tc = if hasFailed then Left faults else Right (result, faults)
@@ -81,6 +82,12 @@ addFault :: F.Fault -> TypeChecker ()
 addFault f = do
     fs <- gets checkerFaults
     modify $ \s -> s { checkerFaults = f : fs }
+
+setCurrentStatement :: S.Statement () -> TypeChecker ()
+setCurrentStatement stmt = modify $ \s -> s { checkerLastStatement = Just stmt }
+
+getLastStatement :: TypeChecker (Maybe (S.Statement ()))
+getLastStatement = gets checkerLastStatement
 
 getGlobals :: TypeChecker Scope
 getGlobals = gets checkerGlobalScope
@@ -225,7 +232,10 @@ castExprImplicitly :: S.Type -> S.Expression S.Type -> TypeChecker (S.Expression
 castExprImplicitly desiredType typedExpr
      | not castNeeded = return typedExpr
      | castPossible = return $ S.CastExpr desiredType typedExpr desiredType
-     | otherwise = addFault fault >> return typedExpr
+     | otherwise = do
+        stmt <- getLastStatement
+        addFault $ makeFault stmt
+        return typedExpr
   where
     actualType = S.tagOfExpr typedExpr
     castNeeded = needsCast actualType desiredType
@@ -233,8 +243,13 @@ castExprImplicitly desiredType typedExpr
 
     failMsg = "Cannot implicitly cast: '" ++ show actualType ++ "' to '" 
         ++ show desiredType ++ "'"
-    failCtx = "In expression: '" ++ show typedExpr ++ "'"
-    fault = F.Fault F.Error failMsg failCtx
+
+    failExpr = "Casted expression: '" ++ show typedExpr ++ "'\n"
+
+    failStmt Nothing = ""
+    failStmt (Just s) = "In statement: '" ++ show s ++ "'"
+
+    makeFault s = F.Fault F.Error failMsg (failExpr ++ failStmt s)
 
 
 resolveBinding :: S.ValueBinding -> TypeChecker S.ValueBinding
@@ -428,30 +443,39 @@ transformExpression (S.ExtFunDeclExpr funDecl _)
 transformExpression (S.NamedTupleDeclExpr name fields _)
     = return $ S.NamedTupleDeclExpr name fields S.TypeUnit
 
+brachCond :: S.Expression () -> TypeChecker (S.Expression S.Type)
+brachCond cond = transformExpression cond >>= castExprImplicitly S.TypeBoolean
+
 transformStatement :: S.Statement () -> TypeChecker (S.Statement S.Type)
-transformStatement (S.ReturnStmt rawExpr) = do
+transformStatement s@(S.ReturnStmt rawExpr) = do
+    setCurrentStatement s
     typedExpr <- transformExpression rawExpr
     return $ S.ReturnStmt typedExpr
 
-transformStatement (S.ExpressionStmt rawExpr) = do
+transformStatement s@(S.ExpressionStmt rawExpr) = do
+    setCurrentStatement s
     typedExpr <- transformExpression rawExpr
     return $ S.ExpressionStmt typedExpr
     
-transformStatement (S.BlockStmt rawStmts) = do
+transformStatement s@(S.BlockStmt rawStmts) = do
+    setCurrentStatement s
     typedStmts <- M.forM rawStmts transformStatement
     return $ S.BlockStmt typedStmts
 
-transformStatement (S.IfStmt rawCondition rawBody) = do
-    typedCondition <- transformExpression rawCondition >>= castExprImplicitly S.TypeBoolean
+transformStatement s@(S.IfStmt rawCondition rawBody) = do
+    setCurrentStatement s
+    cond <- brachCond rawCondition
     typedBody <- transformStatement rawBody
-    return $ S.IfStmt typedCondition typedBody
+    return $ S.IfStmt cond typedBody
 
-transformStatement (S.WhileStmt rawCondition rawBody) = do
-    typedCondition <- transformExpression rawCondition >>= castExprImplicitly S.TypeBoolean
+transformStatement s@(S.WhileStmt rawCondition rawBody) = do
+    setCurrentStatement s
     typedBody <- transformStatement rawBody
-    return $ S.WhileStmt typedCondition typedBody
+    cond <- brachCond rawCondition
+    return $ S.WhileStmt cond typedBody
 
-transformStatement (S.AssignmentStmt rawLhs rawRhs) = do
+transformStatement s@(S.AssignmentStmt rawLhs rawRhs) = do
+    setCurrentStatement s
     -- TODO: check if lhs is valid lhs expression
     lhs <- transformExpression rawLhs
     rhs <- transformExpression rawRhs >>= castExprImplicitly (S.tagOfExpr lhs)
