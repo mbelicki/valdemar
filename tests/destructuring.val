@@ -1,0 +1,10 @@
+fn my_favorite_numbers() -> (int_t, double_t) {
+    return (8, 8.0)
+}
+
+ext_c print_int(a int_t) -> unit_t
+
+fn main() -> unit_t {
+    val (a int_t, b double_t) = my_favorite_numbers()
+    print_int(a)
+}

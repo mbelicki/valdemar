@@ -1,0 +1,6 @@
+tuple vec2_t { x, y double_t }
+
+fn main () -> unit_t {
+    --val a ^[vec2_t] = ^[vec2_t]([(0.0, 0.0)])
+    val b ^[vec2_t] = [(0.0, 0.0)]
+}

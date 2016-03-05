@@ -49,7 +49,7 @@ executeChecker tc = if hasFailed then Left faults else Right (result, faults)
     where
      (result, finalState) = runState (runTypeChecker tc) emptyChecker
      isError (F.Fault kind _ _) = kind == F.Error
-     faults = checkerFaults finalState
+     faults = reverse $ checkerFaults finalState
      hasFailed = any isError faults
 
 -- scope operations:
@@ -202,6 +202,8 @@ resolveType (S.TypeFunction args ret) = do
 resolveType a = return a
 
 needsCast :: S.Type -> S.Type -> Bool
+needsCast t1@(S.TypeTuple n1 _) t2@(S.TypeTuple n2 _)
+    = not (n1 == n2 && hasTheSameLayout t1 t2)
 needsCast actual expected = expected /= actual
 
 hasTheSameLayout :: S.Type -> S.Type -> Bool
@@ -381,16 +383,14 @@ transformExpression e@(S.CallExpr name args _) = do
     stmt <- getLastStatement
 
     let declFail = error $ "Unknown function: " ++ name
-        argTypeFail exp act 
-            = error $ "Mismatched argument types in call of function: " 
-                        ++ name ++ " expected: " ++ show exp ++ " actual: " ++ show act
 
     decl <- Maybe.fromMaybe declFail <$> findDecl name
     typedArgs <- M.forM args transformExpression
     
     actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
     expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
-
+    
+    -- TODO: implicit casts for arguments
     unless (actualArgTypes == expectedArgTypes) $
         addFault $ makeArgTypeFault expectedArgTypes actualArgTypes stmt
 

@@ -1,0 +1,16 @@
+tuple complex_t { real, imag double_t }
+tuple pair_t { a int_t, b complex_t }
+
+ext_c print_int(a int_t) -> unit_t
+
+fn print_first_item(arr ^[pair_t]) -> unit_t {
+    val i int_t = 0
+    val pair ^pair_t = @arr[i]
+
+    print_int(pair->a)
+}
+
+fn main () -> unit_t {
+    val a ^[pair_t] = [(1, (1.0, 0.0)), (3, (3.0, 0.0)), (5, (5.0, 0.0))]
+    print_first_item(a)
+}

@@ -254,9 +254,9 @@ emitExprForAddress (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
 
 
 emitExprForValue :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
-emitExprForValue e@(S.FloatExpr n ty) = CG.const <$> emitConstant e
-emitExprForValue e@(S.IntegerExpr n ty) = CG.const <$> emitConstant e
-emitExprForValue e@(S.BooleanExpr n ty) = CG.const <$> emitConstant e
+emitExprForValue e@(S.FloatExpr   _ _) = CG.const <$> emitConstant e
+emitExprForValue e@(S.IntegerExpr _ _) = CG.const <$> emitConstant e
+emitExprForValue e@(S.BooleanExpr _ _) = CG.const <$> emitConstant e
 emitExprForValue (S.VarExpr n ty) = CG.getLocal n >>= CG.load
 emitExprForValue (S.ValDeclExpr (S.ValBind kind name typeName) n ty) = do
     op <- emitExprForValue n
@@ -282,8 +282,7 @@ emitExprForValue (S.ValDestructuringExpr bindings n ty) = do
         CG.assignLocal name varPtr
     return op
 
-emitExprForValue (S.PrefixOpExpr S.ValRef n _)
-    = emitExprForAddress n
+emitExprForValue (S.PrefixOpExpr S.ValRef n _) = emitExprForAddress n
 
 emitExprForValue (S.PrefixOpExpr op a ty)
     = case Map.lookup op unaryOperators of
@@ -342,7 +341,6 @@ emitExprForValue (S.CallExpr fun args ty) = do
         funSybmol = CG.global retType $ LLVM.Name fun
     CG.call funSybmol argSymbols
 
-emitExprForValue expr@(S.AnonTupleExpr _ _) = CG.load =<< emitExprForAddress expr
 
 emitExprForValue (S.ArrayExpr ns ty) = do
     consts <- M.forM ns $ \n -> emitConstant n
@@ -361,6 +359,7 @@ emitExprForValue (S.ArrayExpr ns ty) = do
     arrayType = LLVM.ArrayType (fromIntegral $ length ns) llvmType
     structType = LLVM.StructureType False [arrayIndexType, arrayType]
 
+emitExprForValue e@S.AnonTupleExpr{} = emitExprForAddress e >>= CG.load
 emitExprForValue e@S.ElementOfExpr{} = emitExprForAddress e >>= CG.load
     
 emitConstant :: S.Expression S.Type -> CG.CodeGenerator LLVM.Const.Constant
