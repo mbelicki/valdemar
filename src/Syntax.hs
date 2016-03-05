@@ -40,6 +40,7 @@ data Type = TypeFloating BitCount
           | TypeFunction [Type] Type
           | TypeTuple Name [TupleFiled]
           | TypeUnknow Name
+          | TypeBottom -- used by type checker for typing errors
           deriving (Eq, Ord)
 
 printFloatingType n
@@ -64,6 +65,7 @@ instance Show Type where
         = if name /= "" then name else "(" ++ fieldsStr ++ ")"
       where
         fieldsStr = showCommaSep $ map (\(Field _ t) -> t) fields
+    show TypeBottom = "_bottom_"
 
 isArray :: Type -> Bool
 isArray (TypeArray _) = True

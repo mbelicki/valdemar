@@ -276,22 +276,29 @@ transformExpression (S.CastExpr    t v _) = do
     return $ S.CastExpr resolveType typedExpr resolveType
 
 -- array literal:
-transformExpression (S.ArrayExpr rawItems _) = do
+transformExpression e@(S.ArrayExpr rawItems _) = do
     items <- M.forM rawItems transformExpression
-    let types         = map S.tagOfExpr items
-        arrayBaseType = inferArrayType types
-        arrayType     = S.TypePointer $ S.TypeArray arrayBaseType
-    return $ S.ArrayExpr items arrayType
+    arrayBaseType <- inferArrayType $ map S.tagOfExpr items
+    return $ S.ArrayExpr items $ S.TypePointer $ S.TypeArray arrayBaseType
   where
+    failMsg = "Mismatched types in literal array declaration."
+    failCtx s = "In expression: '" ++ show e ++ "'\n"
+        ++ "In statement: '" ++ show s ++ "'"
+    makeFault s = F.Fault F.Error failMsg $ failCtx s
+
     checkItemType :: S.Type -> Maybe S.Type -> Maybe S.Type
     checkItemType ta (Just tb) = if ta == tb then Just ta else Nothing
     checkItemType _ Nothing = Nothing
 
-    inferArrayType :: [S.Type] -> S.Type
-    inferArrayType types
-        = Maybe.fromMaybe
-            (error "Mismatched types in literal array declaration.") 
-            (foldr checkItemType (Maybe.listToMaybe types) types)
+    inferArrayType :: [S.Type] -> TypeChecker S.Type
+    inferArrayType types = do 
+        let maybeTypes = foldr checkItemType (Maybe.listToMaybe types) types
+        case maybeTypes of
+            (Just ts) -> return ts
+            Nothing   -> do
+                stmt <- getLastStatement
+                addFault $ makeFault stmt
+                return S.TypeBottom
 
 -- tuple literal:
 transformExpression (S.AnonTupleExpr rawItems _) = do
@@ -349,7 +356,7 @@ transformExpression e@(S.BinOpExpr S.MemberOf argA argB _) = do
     typedArgA <- transformExpression argA
     typedArgB <- transformExpression argB
     
-    return $ S.BinOpExpr S.MemberOf typedArgA typedArgB S.TypeUnit   
+    return $ S.BinOpExpr S.MemberOf typedArgA typedArgB S.TypeBottom
 
 transformExpression (S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
