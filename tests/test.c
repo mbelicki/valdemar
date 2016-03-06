@@ -7,11 +7,11 @@
 #include <inttypes.h>
 
 extern void print_float(double a) {
-    printf("%f\n", a);
+    printf("%f", a);
 }
 
 extern void print_int(int64_t a) {
-    printf("%" PRId64 "\n", a);
+    printf("%" PRId64, a);
 }
 
 extern void print_char(char c) {
@@ -20,6 +20,10 @@ extern void print_char(char c) {
 
 extern char get_char() {
     return getchar();
+}
+
+extern double get_random() {
+    return rand() / (double)RAND_MAX;
 }
 
 extern void bounds_check_failed(void) {

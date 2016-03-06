@@ -11,6 +11,7 @@ import qualified LLVM.General.AST.AddrSpace as LLVM.Addr
 import qualified LLVM.General.Target as LLVM.Targ
 import qualified LLVM.General.Context as LLVM.Ctx
 import qualified LLVM.General.Module as LLVM.Module
+import qualified LLVM.General.PassManager as LLVM.Pass
 
 import qualified Control.Monad.Except as Except
 import qualified Control.Monad as M
@@ -393,6 +394,9 @@ writeOutFile format mod target file
         FormatLLVMBitCode ->  LLVM.Module.writeBitcodeToFile file mod
         FormatLLVMLanguage -> LLVM.Module.writeLLVMAssemblyToFile file mod
 
+optPasses :: LLVM.Pass.PassSetSpec
+optPasses = LLVM.Pass.defaultCuratedPassSetSpec { LLVM.Pass.optLevel = Just 3 }
+
 generate :: OutModuleFormat -> String -> String -> [S.Expression S.Type] -> IO LLVM.Module
 generate format name outPath defs =
     LLVM.Ctx.withContext $ \context ->
@@ -400,6 +404,11 @@ generate format name outPath defs =
             --print newAst
             --putStrLn ""
             liftError $ LLVM.Module.withModuleFromAST context newAst $ \m -> do
+                -- run optimizations:
+                LLVM.Pass.withPassManager optPasses $ \pm -> do
+                    LLVM.Pass.runPassManager pm m
+                    LLVM.Module.moduleAST m
+
                 let outFile = LLVM.Module.File outPath
                 writeOutFile format m target outFile
                 return newAst

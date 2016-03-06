@@ -202,8 +202,8 @@ resolveType (S.TypeFunction args ret) = do
 resolveType a = return a
 
 needsCast :: S.Type -> S.Type -> Bool
-needsCast t1@(S.TypeTuple n1 _) t2@(S.TypeTuple n2 _)
-    = not (n1 == n2 && hasTheSameLayout t1 t2)
+needsCast t1@(S.TypeTuple n1 _) t2@(S.TypeTuple n2 _) = n1 /= n2
+    -- = not (n1 == n2 && hasTheSameLayout t1 t2)
 needsCast actual expected = expected /= actual
 
 hasTheSameLayout :: S.Type -> S.Type -> Bool
