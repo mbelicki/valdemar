@@ -1,0 +1,286 @@
+-- this is a simple path tracer used to test capabilities of valdemar
+-- loosely based on: http://www.kevinbeason.com/smallpt/
+
+ext_c cos (a double_t) -> double_t
+ext_c sin (a double_t) -> double_t
+ext_c sqrt (a double_t) -> double_t
+ext_c fabs (a double_t) -> double_t
+ext_c pow (a double_t, a double_t) -> double_t
+
+tuple vec3_t {
+    x, y, z double_t
+}
+
+fn vec3_add (a, b vec3_t) -> vec3_t {
+    return (a.x + b.x, a.y + b.y, a.z + b.z)
+}
+
+fn vec3_sub (a, b vec3_t) -> vec3_t {
+    return (a.x - b.x, a.y - b.y, a.z - b.z)
+}
+
+-- element-wise multiplication:
+fn vec3_mul (a, b vec3_t) -> vec3_t {
+    return (a.x * b.x, a.y * b.y, a.z * b.z)
+}
+
+fn vec3_scale (a vec3_t, k double_t) -> vec3_t {
+    return (a.x * k, a.y * k, a.z * k)
+}
+
+fn vec3_normalize(a vec3_t) -> vec3_t {
+    val (x, y, z double_t) = a
+    val len double_t = x * x + y * y + z * z
+    val k double_t = 1.0 / sqrt(len)
+    return vec3_scale(a, k)
+}
+
+fn vec3_dot (a, b vec3_t) -> double_t {
+    return a.x * b.x + a.y * b.y + a.z * b.z
+}
+
+fn vec3_cross (a, b vec3_t) -> vec3_t {
+    return (a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
+}
+
+fn vec3_lerp (a, b vec3_t, k double_t) -> vec3_t {
+    if k <= 0.0 return a
+    if k >= 1.0 return b
+
+    val nk double_t = 1.0 - k
+    val out vec3_t = (0, 0, 0)
+    out.x = a.x * nk + b.x * k
+    out.y = a.y * nk + b.y * k
+    out.z = a.z * nk + b.z * k
+    return out
+}
+
+tuple ray_t {
+    origin, direction vec3_t
+}
+
+tuple sphere_t {
+    radius double_t,
+    position, emission, color vec3_t,
+    roughness double_t,
+}
+
+fn ray_sphere_intersection (ray ^ray_t, sphere ^sphere_t) -> double_t {
+    val op vec3_t = vec3_sub(sphere->position, ray->origin)
+    val eps double_t = 0.0001
+    val b double_t = vec3_dot(op, ray->direction)
+    val rad double_t = sphere->radius
+    val det double_t = b * b - vec3_dot(op, op) + rad * rad
+
+    if det < 0.0 return 0.0
+    
+    val !t double_t = b - sqrt(det)
+    if t > eps return t
+    
+    t = b + sqrt(det)
+    if t > eps return t
+
+    return 0.0
+}
+
+fn clamp (x double_t) -> double_t { 
+    if x < 0.0 return 0.0
+    if x > 1.0 return 1.0
+    return x
+}
+
+fn intersects_any 
+        (ray ^ray_t, spheres ^[sphere_t]) -> (bool_t, double_t, int_t) {
+    val inf double_t = 1000000000.0 -- TODO: valemar needs demical separators
+
+    val !t  double_t = inf
+    val !id int_t = 0
+    val !i  int_t = 0
+
+    while i < #spheres { -- TODO: of course for loop would be handy
+        val sphere ^sphere_t = @spheres[i]
+        val d double_t = ray_sphere_intersection(ray, sphere)
+        if d > 0.0 & d < t {
+            t = d
+            id = i
+        }
+        i = i + 1
+    }
+
+    return (t < inf, t, id)
+}
+
+fn vec3_max(a vec3_t) -> double_t {
+    if a.x > a.y & a.x > a.z {
+        return a.x
+    }
+    if a.y > a.z {
+        return a.y
+    }
+    return a.z
+}
+
+ext_c get_random() -> double_t
+
+fn reflect (ray ^ray_t, hit_point, hit_normal vec3_t, roughness double_t) -> ray_t {
+    val PI double_t = 3.1415
+    -- pure specular reflection vector
+    val nod double_t = 2.0 * vec3_dot(hit_normal, ray->direction)
+    val refl_dir vec3_t = vec3_sub(ray->direction, vec3_scale(hit_normal, nod))
+    if roughness < 0.0001 {
+        return (hit_point, refl_dir)
+    }
+
+    val r1  double_t = 2.0 * PI * get_random()
+    val r2  double_t = get_random()
+    val r2s double_t = sqrt(r2)
+
+    val versor vec3_t = (1.0, 0.0, 0.0)
+    if fabs(hit_normal.x) > 0.1 {
+        versor = (0.0, 1.0, 0.0)
+    }
+
+    val u_dir vec3_t = vec3_normalize(vec3_cross(versor, hit_normal))
+    val v_dir vec3_t = vec3_cross(hit_normal, u_dir)
+
+    val u vec3_t = vec3_scale(u_dir, cos(r1) * r2s)
+    val v vec3_t = vec3_scale(v_dir, sin(r1) * r2s)
+    val nn vec3_t = vec3_scale(hit_normal, sqrt(1.0 - r2))
+
+    val diff_dir vec3_t = vec3_normalize(vec3_add(u, vec3_add(v, nn)))
+
+    val dir vec3_t = vec3_lerp(refl_dir, diff_dir, roughness)
+
+    return (hit_point, dir)
+}
+
+fn radiance (ray ^ray_t, spheres ^[sphere_t], !depth int_t) -> vec3_t {
+    val (intersect bool_t, t double_t, id int_t) = intersects_any(ray, spheres)
+    if not intersect {
+        return (0, 0, 0) -- no intersection return black
+    }
+    val obj ^sphere_t = @spheres[id]
+    depth = depth + 1
+    if depth > 4 {
+        return obj->emission
+    }
+
+    val x vec3_t = vec3_add(ray->origin, vec3_scale(ray->direction, t)) -- position
+    val n vec3_t = vec3_normalize(vec3_sub(x, obj->position)) -- normal
+
+    val !nl vec3_t = n 
+    if vec3_dot(n, ray->direction) >= 0.0 {
+        nl = vec3_scale(n, -1.0)
+    }
+    val f vec3_t = obj->color -- ??
+    val p double_t = vec3_max(f)
+    
+    val new_ray ray_t = reflect(ray, x, nl, obj->roughness)
+    val rad vec3_t = radiance(@new_ray, spheres, depth)
+    return vec3_add(obj->emission, vec3_mul(rad, f))
+}
+
+fn cast_ray (camera ^ray_t, x, y double_t, scene ^[sphere_t]) -> vec3_t {
+    val (nx, ny double_t) = (x - 0.5, 0.5 - y)
+    
+    val fov double_t = 0.545
+    val img_point vec3_t = (nx * fov, ny * fov, 0)
+    val d vec3_t = vec3_add(img_point, camera->direction)
+    val o vec3_t = vec3_add(vec3_scale(d, 140.0), camera->origin)
+
+    val ray ray_t = (o, vec3_normalize(d))
+
+    return radiance(@ray, scene, 0)
+}
+
+ext_c print_int (a int_t) -> unit_t
+ext_c print_char (a byte_t) -> unit_t
+fn print (str str_t) -> unit_t {
+    val !i int_t = 0
+    while i < #str {
+        print_char(str[i])
+        i = i + 1
+    }
+}
+
+fn print_ppm_header (width, height int_t) -> unit_t {
+    print("P3\n")
+    print_int(width)
+    print(" ")
+    print_int(height)
+    print("\n255\n")
+}
+
+fn correct_gamma (x double_t) -> int_t {
+    return int_t(pow(clamp(x), 1.0 / 2.2) * 255.0 + 0.5)
+}
+
+fn print_color (color vec3_t) -> unit_t {
+    print_int(correct_gamma(color.x))
+    print(" ")
+    print_int(correct_gamma(color.y))
+    print(" ")
+    print_int(correct_gamma(color.z))
+    print(" ")
+}
+
+fn main () -> unit_t {
+    val (width, height int_t) = (512, 512)
+    val samples int_t = 4096 -- per pixel
+
+    val cam_dir vec3_t = vec3_normalize(vec3_t((0.0, -0.062, -1.0)))
+    val camera ray_t = ((50.0, 52.0, 295.6), cam_dir)
+
+    val spheres ^[sphere_t] = [ -- scene: radius, position, emission, color, material
+        (100000.0, (100001.0, 40.8, 81.6), (0.00, 0.00, 0.00), (0.75, 0.25, 0.25), 1.0), -- left
+        (100000.0, (-99901.0, 40.8, 81.6), (0.00, 0.00, 0.00), (0.25, 0.25, 0.75), 1.0), -- rght
+        (100000.0, (50.0, 40.8, 100000.0), (0.00, 0.00, 0.00), (0.75, 0.75, 0.75), 1.0), -- back
+        (100000.0, (50.0, 40.8, -99830.0), (0.00, 0.00, 0.00), (0.75, 0.75, 0.75), 1.0), -- front
+        (100000.0, (50.0, 100000.0, 81.6), (0.00, 0.00, 0.00), (0.75, 0.75, 0.75), 1.0), -- bottom
+        (100000.0, (50.0, -99918.4, 81.6), (0.00, 0.00, 0.00), (0.75, 0.75, 0.75), 1.0), -- top
+
+        (16.50000, (27.0, 16.5, 37.0),     (0.00, 0.00, 0.00), (0.99, 0.99, 0.99), 0.0), -- mirror
+        (16.50000, (73.0, 16.5, 68.0),     (0.00, 0.00, 0.00), (0.99, 0.99, 0.99), 0.0), -- glass
+
+        (8.000000, (81.0, 8.0, 42.0),      (4.00, 0.50, 4.00), (0.00, 0.00, 0.00), 1.0), -- light
+        (2.000000, (21.0, 2.0, 82.0),      (6.00, 9.00, 3.00), (0.00, 0.00, 0.00), 1.0), -- light
+        (600.0000, (50.0, 681.45, 81.6),   (18.0, 16.5, 16.0), (0.00, 0.00, 0.00), 1.0), -- light
+
+        (4.000000, (05.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 1.0), -- ball
+        (4.000000, (15.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.9), -- ball
+        (4.000000, (25.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.8), -- ball
+        (4.000000, (35.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.7), -- ball
+        (4.000000, (45.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.6), -- ball
+        (4.000000, (55.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.5), -- ball
+        (4.000000, (65.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.4), -- ball
+        (4.000000, (75.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.3), -- ball
+        (4.000000, (85.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.2), -- ball
+        (4.000000, (95.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.1), -- ball
+    ]
+    -- PPM header
+    print_ppm_header(width, height)
+    -- TODO: fix when more loops are available
+    val (!x, !y, !i int_t) = (0, 0, 0)
+    val (!nx, !ny double_t) = (0.0, 0.0)
+    val color vec3_t = (0, 0, 0)
+    while y < height {
+        x = 0
+        ny = double_t(y) / double_t(height)
+        while x < width {
+            nx = double_t(x) / double_t(width)
+
+            i = 0
+            color.x = 0
+            color.y = 0
+            color.z = 0
+            while i < samples {
+               color = vec3_add(color, cast_ray(@camera, nx, ny, spheres))
+               i = i + 1
+            }
+
+            print_color(vec3_scale(color, 1.0 / double_t(samples)))
+            x = x + 1
+        }
+        y = y + 1
+    }
+}
