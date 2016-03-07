@@ -22,8 +22,11 @@ extern char get_char() {
     return getchar();
 }
 
+static unsigned short Xi[3] = {0, 0, 209};
+
 extern double get_random() {
-    return rand() / (double)RAND_MAX;
+    //return rand() / (double)RAND_MAX;
+    return erand48(Xi);
 }
 
 extern void bounds_check_failed(void) {

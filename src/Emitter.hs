@@ -322,7 +322,9 @@ emitExprForValue (S.CastExpr targetType n _) = do
   where
     conversions = Map.fromList
         [ ((S.TypeFloating 64, S.TypeInteger 64), CG.fptosi)
+        , ((S.TypeFloating 32, S.TypeInteger 64), CG.fptosi)
         , ((S.TypeInteger 64, S.TypeFloating 64), CG.sitofp)
+        , ((S.TypeInteger 64, S.TypeFloating 32), CG.sitofp)
         , ((S.TypeInteger 8,  S.TypeInteger 64), CG.zext)
         , ((S.TypeInteger 64, S.TypeInteger 8), CG.trunc)
         ]

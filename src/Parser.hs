@@ -49,9 +49,8 @@ typeUnit :: Parser Type
 typeUnit = reserved "unit_t" >> return TypeUnit
 
 typeFloating :: Parser Type
-typeFloating = do
-    reserved "double_t" -- TODO: support other types
-    return $ TypeFloating 64
+typeFloating = (reserved "double_t" >> return (TypeFloating 64))
+            <|> (reserved "float_t" >> return (TypeFloating 32))
 
 typeInteger :: Parser Type
 typeInteger = (reserved "int_t" >> return (TypeInteger 64))
