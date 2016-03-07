@@ -66,18 +66,19 @@ tuple sphere_t {
 }
 
 fn ray_sphere_intersection (ray ^ray_t, sphere ^sphere_t) -> double_t {
-    val op vec3_t = vec3_sub(sphere->position, ray->origin)
     val eps double_t = 0.0001
+
+    val op vec3_t = vec3_sub(sphere->position, ray->origin)
     val b double_t = vec3_dot(op, ray->direction)
     val rad double_t = sphere->radius
     val det double_t = b * b - vec3_dot(op, op) + rad * rad
-
     if det < 0.0 return 0.0
-    
-    val !t double_t = b - sqrt(det)
+
+    val det_root double_t = sqrt(det)
+    val !t double_t = b - det_root
     if t > eps return t
     
-    t = b + sqrt(det)
+    t = b + det_root
     if t > eps return t
 
     return 0.0
@@ -120,7 +121,15 @@ fn vec3_max(a vec3_t) -> double_t {
     return a.z
 }
 
-ext_c get_random() -> double_t
+ext_c get_random() -> double_t -- random number from uniform range of [0, 1]
+
+fn get_random_signed() -> double_t { -- random from unifrom range of [-1, 1]
+    val value double_t = get_random()
+    if get_random() < 0.5 {
+        return -1.0 * value
+    }
+    return value
+}
 
 fn reflect (ray ^ray_t, hit_point, hit_normal vec3_t, roughness double_t) -> ray_t {
     val PI double_t = 3.1415
@@ -154,14 +163,13 @@ fn reflect (ray ^ray_t, hit_point, hit_normal vec3_t, roughness double_t) -> ray
     return (hit_point, dir)
 }
 
-fn radiance (ray ^ray_t, spheres ^[sphere_t], !depth int_t) -> vec3_t {
+fn radiance (ray ^ray_t, spheres ^[sphere_t], depth int_t) -> vec3_t {
     val (intersect bool_t, t double_t, id int_t) = intersects_any(ray, spheres)
     if not intersect {
         return (0, 0, 0) -- no intersection return black
     }
     val obj ^sphere_t = @spheres[id]
-    depth = depth + 1
-    if depth > 4 {
+    if depth <= 0 {
         return obj->emission
     }
 
@@ -172,15 +180,13 @@ fn radiance (ray ^ray_t, spheres ^[sphere_t], !depth int_t) -> vec3_t {
     if vec3_dot(n, ray->direction) >= 0.0 {
         nl = vec3_scale(n, -1.0)
     }
-    val f vec3_t = obj->color -- ??
-    val p double_t = vec3_max(f)
     
     val new_ray ray_t = reflect(ray, x, nl, obj->roughness)
-    val rad vec3_t = radiance(@new_ray, spheres, depth)
-    return vec3_add(obj->emission, vec3_mul(rad, f))
+    val rad vec3_t = radiance(@new_ray, spheres, depth - 1)
+    return vec3_add(obj->emission, vec3_mul(rad, obj->color))
 }
 
-fn cast_ray (camera ^ray_t, x, y double_t, scene ^[sphere_t]) -> vec3_t {
+fn cast_ray (camera ^ray_t, x, y double_t) -> ray_t {
     val (nx, ny double_t) = (x - 0.5, 0.5 - y)
     
     val fov double_t = 0.545
@@ -188,9 +194,7 @@ fn cast_ray (camera ^ray_t, x, y double_t, scene ^[sphere_t]) -> vec3_t {
     val d vec3_t = vec3_add(img_point, camera->direction)
     val o vec3_t = vec3_add(vec3_scale(d, 140.0), camera->origin)
 
-    val ray ray_t = (o, vec3_normalize(d))
-
-    return radiance(@ray, scene, 0)
+    return (o, vec3_normalize(d))
 }
 
 ext_c print_int (a int_t) -> unit_t
@@ -217,16 +221,17 @@ fn correct_gamma (x double_t) -> int_t {
 
 fn print_color (color vec3_t) -> unit_t {
     print_int(correct_gamma(color.x))
-    print(" ")
+    print_char(' ')
     print_int(correct_gamma(color.y))
-    print(" ")
+    print_char(' ')
     print_int(correct_gamma(color.z))
-    print(" ")
+    print_char(' ')
 }
 
 fn main () -> unit_t {
     val (width, height int_t) = (512, 512)
-    val samples int_t = 4096 -- per pixel
+    val samples int_t = 128 -- per pixel
+    val max_depth int_t = 4 -- max. amout of photon bounces
 
     val cam_dir vec3_t = vec3_normalize(vec3_t((0.0, -0.062, -1.0)))
     val camera ray_t = ((50.0, 52.0, 295.6), cam_dir)
@@ -240,29 +245,20 @@ fn main () -> unit_t {
         (100000.0, (50.0, -99918.4, 81.6), (0.00, 0.00, 0.00), (0.75, 0.75, 0.75), 1.0), -- top
 
         (16.50000, (27.0, 16.5, 37.0),     (0.00, 0.00, 0.00), (0.99, 0.99, 0.99), 0.0), -- mirror
-        (16.50000, (73.0, 16.5, 68.0),     (0.00, 0.00, 0.00), (0.99, 0.99, 0.99), 0.0), -- glass
+        (16.50000, (73.0, 16.5, 68.0),     (0.00, 0.00, 0.00), (0.99, 0.99, 0.99), 0.2), -- glass
 
         (8.000000, (81.0, 8.0, 42.0),      (4.00, 0.50, 4.00), (0.00, 0.00, 0.00), 1.0), -- light
-        (2.000000, (21.0, 2.0, 82.0),      (6.00, 9.00, 3.00), (0.00, 0.00, 0.00), 1.0), -- light
+        (2.500000, (21.0, 2.5, 82.0),      (16.0, 19.0, 4.00), (0.00, 0.00, 0.00), 1.0), -- light
         (600.0000, (50.0, 681.45, 81.6),   (18.0, 16.5, 16.0), (0.00, 0.00, 0.00), 1.0), -- light
-
-        (4.000000, (05.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 1.0), -- ball
-        (4.000000, (15.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.9), -- ball
-        (4.000000, (25.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.8), -- ball
-        (4.000000, (35.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.7), -- ball
-        (4.000000, (45.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.6), -- ball
-        (4.000000, (55.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.5), -- ball
-        (4.000000, (65.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.4), -- ball
-        (4.000000, (75.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.3), -- ball
-        (4.000000, (85.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.2), -- ball
-        (4.000000, (95.0, 8.0, 114.0),     (0.00, 0.00, 0.00), (0.50, 0.50, 0.50), 0.1), -- ball
     ]
     -- PPM header
     print_ppm_header(width, height)
     -- TODO: fix when more loops are available
     val (!x, !y, !i int_t) = (0, 0, 0)
-    val (!nx, !ny double_t) = (0.0, 0.0)
+    val (!nx, !ny, !rnx, !rny double_t) = (0.0, 0.0, 0.0, 0.0)
+    val (dx, dy double_t) = (0.7 / double_t(width), 0.7 / double_t(height)) -- pixel size
     val color vec3_t = (0, 0, 0)
+    val ray ray_t = ((0, 0, 0), (0, 0, 0))
     while y < height {
         x = 0
         ny = double_t(y) / double_t(height)
@@ -274,8 +270,11 @@ fn main () -> unit_t {
             color.y = 0
             color.z = 0
             while i < samples {
-               color = vec3_add(color, cast_ray(@camera, nx, ny, spheres))
-               i = i + 1
+                rnx = nx + get_random_signed() * dx
+                rny = ny + get_random_signed() * dy
+                ray = cast_ray(@camera, rnx, rny)
+                color = vec3_add(color, radiance(@ray, spheres, max_depth))
+                i = i + 1
             }
 
             print_color(vec3_scale(color, 1.0 / double_t(samples)))
