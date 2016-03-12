@@ -363,12 +363,20 @@ transformExpression e@(S.BinOpExpr S.MemberOf argA argB _) = do
     
     return $ S.BinOpExpr S.MemberOf typedArgA typedArgB S.TypeBottom
 
-transformExpression (S.BinOpExpr op argA argB _) = do
+transformExpression e@(S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
     typedB <- transformExpression argB
-    let opType = if S.tagOfExpr typedA == S.tagOfExpr typedB
-                 then getOpType op (S.tagOfExpr typedA)
-                 else error "Mismatched types in operator expression."
+
+    stmt <- getLastStatement
+    opType <- if S.tagOfExpr typedA == S.tagOfExpr typedB
+              then return $ getOpType op (S.tagOfExpr typedA)
+              else do 
+                let failMsg = "Mismatched types in operator expression"
+                    failCtx = "In expression: " ++ show e ++ "\n"
+                        ++ "In statement: " ++ show stmt
+                addFault $ F.Fault F.Error failMsg failCtx
+                return S.TypeBottom 
+
     return $ S.BinOpExpr op typedA typedB opType
   where
     getOpType :: S.Operation -> S.Type -> S.Type

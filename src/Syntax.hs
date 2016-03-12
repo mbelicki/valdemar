@@ -23,7 +23,28 @@ data Operation
     | ArrayLen                       -- array lenght
     | ValRef | PtrDeRef              -- value reference and pointer drreference
     | MemberOf | DeRefMemberOf       -- . and ->
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+-- TODO: keep this somehow in sync with similar table Parser
+instance Show Operation where
+    show Add = "+"
+    show Sub = "-"
+    show Mul = "*"
+    show Div = "/"
+    show BitAnd = "&"
+    show BitOr = "|"
+    show LogNot = "not"
+    show Eq = "=="
+    show Neq = "/="
+    show Lt = "<"
+    show Lte = "<="
+    show Gt = ">"
+    show Gte = ">="
+    show ArrayLen = "#"
+    show ValRef = "@"
+    show PtrDeRef = "$"
+    show MemberOf = "."
+    show DeRefMemberOf = "->"
 
 data BindingKind = Immutable | Mutable deriving (Eq, Ord, Show)
 
