@@ -230,7 +230,7 @@ fn print_color (color vec3_t) -> unit_t {
 
 fn main () -> unit_t {
     val (width, height int_t) = (512, 512)
-    val samples int_t = 128 -- per pixel
+    val samples int_t = 4096 * 2 -- per pixel
     val max_depth int_t = 4 -- max. amout of photon bounces
 
     val cam_dir vec3_t = vec3_normalize(vec3_t((0.0, -0.062, -1.0)))

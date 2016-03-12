@@ -232,6 +232,9 @@ canCastImplicitly t1@(S.TypeTuple name1 _) t2@(S.TypeTuple name2 _)
   where
     nameCompatible = name1 == "" || name2 == "" || name1 == name2
     fieldsCompatible = hasTheSameLayout t1 t2
+-- allow to use single filed tuples as values of the filed's type
+canCastImplicitly t1@S.TypeTuple{} t2
+    = hasTheSameLayout t1 (S.TypeTuple "" [S.Field "" t2])
 
 canCastImplicitly (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
 canCastImplicitly _ _ = False

@@ -220,9 +220,12 @@ fn embedded_structs() -> unit_t {
     vec3_print(pair.v2)
 }
 
+fn implicit_casts() -> unit_t {
+    val k double_t = (1.0 - 0.5)
+    print_float(k)
+}
+
 fn main () -> unit_t {
-    -- array_assignment()
-    -- structs()
-    embedded_structs()
+    implicit_casts()
 }
 

@@ -317,8 +317,7 @@ emitExprForValue (S.CastExpr targetType@(S.TypeTuple _ _) n _) = do
 
 emitExprForValue (S.CastExpr targetType n _) = do 
     let originalType = S.tagOfExpr n
-    op <- emitExprForValue n
-    convert originalType targetType op
+    convert originalType targetType
   where
     conversions = Map.fromList
         [ ((S.TypeFloating 64, S.TypeInteger 64), CG.fptosi)
@@ -329,13 +328,24 @@ emitExprForValue (S.CastExpr targetType n _) = do
         , ((S.TypeInteger 64, S.TypeInteger 8), CG.trunc)
         ]
 
-    convert :: S.Type -> S.Type -> LLVM.Operand -> CG.CodeGenerator LLVM.Operand
-    convert _ ty@(S.TypePointer _) op = CG.bitcast op $ getLLVMType ty
-    convert innerType outerType op
-        = case Map.lookup (innerType, outerType) conversions of
-            Nothing -> error $ "Conversion is missing: " 
-                ++ show innerType ++ " to " ++ show outerType
-            Just instr -> instr (getLLVMType outerType) op
+    convert :: S.Type -> S.Type -> CG.CodeGenerator LLVM.Operand
+    convert _ ty@(S.TypePointer _) = do 
+        op <- emitExprForValue n
+        CG.bitcast op $ getLLVMType ty
+    convert tuple@(S.TypeTuple _ fields) scalar = do
+        -- when casting from single filed tuple to scalar just take the first
+        -- field
+        ptr <- emitExprForAddress n
+        let offset       = CG.const $ LLVM.Const.Int 32 0
+            memberOffset = CG.const $ LLVM.Const.Int 32 0
+        memberPtr <- CG.getElementPtr ptr [offset, memberOffset]
+        CG.load memberPtr
+    convert innerType outerType = do
+        op <- emitExprForValue n
+        case Map.lookup (innerType, outerType) conversions of
+          Nothing -> error $ "Conversion is missing: " 
+              ++ show innerType ++ " to " ++ show outerType
+          Just instr -> instr (getLLVMType outerType) op
 
 
 emitExprForValue (S.CallExpr fun args ty) = do

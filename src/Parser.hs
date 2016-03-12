@@ -247,7 +247,6 @@ anyExpr = try floating
       <|> try call
       <|> try elementOf
       <|> variable
-      <|> parens expr
 
 expr :: Parser (Expression ())
 expr = E.buildExpressionParser table anyExpr
