@@ -223,9 +223,7 @@ fn embedded_structs() -> unit_t {
 
 fn implicit_casts() -> unit_t {
     val i double_t = (1 - 0.5)
-    val k double_t = 2 * 1 / i
-    print_float(i)
-    print_char(' ')
+    val k double_t = 2 * 1 / i + sq(8 - 6)
     print_float(k)
     print_char('\n')
 }

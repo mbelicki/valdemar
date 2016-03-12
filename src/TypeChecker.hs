@@ -431,12 +431,12 @@ transformExpression e@(S.CallExpr name args _) = do
     let declFail = error $ "Unknown function: " ++ name
 
     decl <- Maybe.fromMaybe declFail <$> findDecl name
-    typedArgs <- M.forM args transformExpression
+    expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
+    typedArgs <- M.forM (zip args expectedArgTypes) $ \(expr, ty) -> do 
+        typed <- transformExpression expr
+        castExprImplicitly ty typed
     
     actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
-    expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
-    
-    -- TODO: implicit casts for arguments
     unless (actualArgTypes == expectedArgTypes) $
         addFault $ makeArgTypeFault expectedArgTypes actualArgTypes stmt
 
