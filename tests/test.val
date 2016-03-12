@@ -215,14 +215,19 @@ tuple pair_t {
 }
 
 fn embedded_structs() -> unit_t {
-    val pair pair_t = ((1.0, 0.0, 0.0), ones())
-    vec3_print(pair.v1)
-    vec3_print(pair.v2)
+    val first pair_t = (vec3_t((1.0, 0.0, 0.0)), ones())
+    val second pair_t = ((1.0, 0.0, 0.0), ones())
+    vec3_print(second.v1)
+    vec3_print(second.v2)
 }
 
 fn implicit_casts() -> unit_t {
-    val k double_t = 2.0 * (1.0 - 0.5)
+    val i double_t = (1 - 0.5)
+    val k double_t = 2 * 1 / i
+    print_float(i)
+    print_char(' ')
     print_float(k)
+    print_char('\n')
 }
 
 fn main () -> unit_t {

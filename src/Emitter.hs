@@ -253,6 +253,8 @@ emitExprForAddress (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
     getFieldOffset :: [S.TupleFiled] -> S.Name -> Maybe Int
     getFieldOffset fields name = List.findIndex (\(S.Field nm _) -> nm == name) fields
 
+emitExprForAddress e = error ("Critical error: emitting for address: '" ++ show e 
+                        ++ "' of type: '" ++ show (S.tagOfExpr e) ++ "'")
 
 emitExprForValue :: S.Expression S.Type -> CG.CodeGenerator LLVM.Operand
 emitExprForValue e@(S.FloatExpr   _ _) = CG.const <$> emitConstant e
@@ -407,7 +409,7 @@ writeOutFile format mod target file
         FormatLLVMLanguage -> LLVM.Module.writeLLVMAssemblyToFile file mod
 
 optPasses :: LLVM.Pass.PassSetSpec
-optPasses = LLVM.Pass.defaultCuratedPassSetSpec { LLVM.Pass.optLevel = Just 3 }
+optPasses = LLVM.Pass.defaultCuratedPassSetSpec { LLVM.Pass.optLevel = Just 0 }
 
 generate :: OutModuleFormat -> String -> String -> [S.Expression S.Type] -> IO LLVM.Module
 generate format name outPath defs =

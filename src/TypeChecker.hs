@@ -183,8 +183,8 @@ resolveType t@(S.TypeUnknow name) = do
     if Maybe.isNothing maybeAlias
         then return t
         else do
-            let Just (nm, ty) = maybeAlias
-            return ty
+            let Just (_, ty) = maybeAlias
+            resolveType ty -- TODO: infinite recursion on list node tuples
 
 resolveType (S.TypeArray ty) = do
     resTy <- resolveType ty
@@ -201,9 +201,22 @@ resolveType (S.TypeFunction args ret) = do
 
 resolveType a = return a
 
+resolveBinding :: S.ValueBinding -> TypeChecker S.ValueBinding
+resolveBinding (S.ValBind kind nm ty) = do
+    resTy <- resolveType ty
+    return $ S.ValBind kind nm resTy
+
+simplifyType :: S.Type -> S.Type
+simplifyType t@(S.TypeTuple name fields)
+    | null fields = S.TypeUnit
+    | length fields == 1 = (\(S.Field _ t) -> t) $ head fields
+    | otherwise = t
+simplifyType t = t
+
+
 needsCast :: S.Type -> S.Type -> Bool
 needsCast t1@(S.TypeTuple n1 _) t2@(S.TypeTuple n2 _) = n1 /= n2
-    -- = not (n1 == n2 && hasTheSameLayout t1 t2)
+needsCast _ S.TypeBottom = False
 needsCast actual expected = expected /= actual
 
 hasTheSameLayout :: S.Type -> S.Type -> Bool
@@ -211,8 +224,8 @@ hasTheSameLayout  S.TypeBoolean S.TypeBoolean = True
 hasTheSameLayout (S.TypeInteger n1) (S.TypeInteger n2) = n1 == n2
 hasTheSameLayout (S.TypeFloating n1) (S.TypeFloating n2) = n1 == n2
 hasTheSameLayout (S.TypeArray t1) (S.TypeArray t2) = hasTheSameLayout t1 t2
-hasTheSameLayout (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
-hasTheSameLayout (S.TypeTuple _ fields1) (S.TypeTuple _ fields2) 
+hasTheSameLayout (S.TypePointer t1) (S.TypePointer t2) = True
+hasTheSameLayout (S.TypeTuple _ fields1) (S.TypeTuple _ fields2)
     = and $ zipWith hasTheSameLayout fs1 fs2
   where
     stripFiledNames = map (\(S.Field _ t) -> t)
@@ -225,8 +238,8 @@ canCastImplicitly :: S.Type -> S.Type -> Bool
 canCastImplicitly  S.TypeBoolean      (S.TypeInteger _)   = True
 canCastImplicitly  S.TypeBoolean      (S.TypeFloating _)  = True
 canCastImplicitly (S.TypeInteger _)   (S.TypeFloating _)  = True
-canCastImplicitly (S.TypeInteger n1)  (S.TypeInteger n2)  = n1 < n2
-canCastImplicitly (S.TypeFloating n1) (S.TypeFloating n2) = n1 < n2
+canCastImplicitly (S.TypeInteger n1)  (S.TypeInteger n2)  = n1 <= n2
+canCastImplicitly (S.TypeFloating n1) (S.TypeFloating n2) = n1 <= n2
 canCastImplicitly t1@(S.TypeTuple name1 _) t2@(S.TypeTuple name2 _) 
     = nameCompatible && fieldsCompatible
   where
@@ -234,10 +247,11 @@ canCastImplicitly t1@(S.TypeTuple name1 _) t2@(S.TypeTuple name2 _)
     fieldsCompatible = hasTheSameLayout t1 t2
 -- allow to use single filed tuples as values of the filed's type
 canCastImplicitly t1@S.TypeTuple{} t2
-    = hasTheSameLayout t1 (S.TypeTuple "" [S.Field "" t2])
+    -- = hasTheSameLayout t1 (S.TypeTuple "" [S.Field "" t2])
+    = canCastImplicitly (simplifyType t1) t2
 
 canCastImplicitly (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
-canCastImplicitly _ _ = False
+canCastImplicitly a b = a == b
 
 castExprImplicitly :: S.Type -> S.Expression S.Type -> TypeChecker (S.Expression S.Type)
 castExprImplicitly desiredType typedExpr
@@ -262,11 +276,13 @@ castExprImplicitly desiredType typedExpr
 
     makeFault s = F.Fault F.Error failMsg (failExpr ++ failStmt s)
 
+findCommonImplicitTypes :: [S.Type] -> [S.Type]
+findCommonImplicitTypes ts = List.nub $ filter (canCastTo ts) ts
+  where
+    simplified = map simplifyType ts
 
-resolveBinding :: S.ValueBinding -> TypeChecker S.ValueBinding
-resolveBinding (S.ValBind kind nm ty) = do
-    resTy <- resolveType ty
-    return $ S.ValBind kind nm resTy
+    canCastTo :: [S.Type] -> S.Type -> Bool
+    canCastTo ts t = all (`canCastImplicitly` t) ts
 
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
@@ -310,7 +326,9 @@ transformExpression (S.AnonTupleExpr rawItems _) = do
     items <- M.forM rawItems transformExpression
     let types     = map (S.Field "" . S.tagOfExpr) items
         tupleType = S.TypeTuple "" types
-    return $ S.AnonTupleExpr items tupleType
+    return $ if length items == 1 
+             then head items
+             else S.AnonTupleExpr items tupleType
 
 -- operators:
 transformExpression (S.PrefixOpExpr op arg _) = do
@@ -366,18 +384,35 @@ transformExpression e@(S.BinOpExpr S.MemberOf argA argB _) = do
 transformExpression e@(S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
     typedB <- transformExpression argB
-
+    
     stmt <- getLastStatement
-    opType <- if S.tagOfExpr typedA == S.tagOfExpr typedB
-              then return $ getOpType op (S.tagOfExpr typedA)
-              else do 
-                let failMsg = "Mismatched types in operator expression"
-                    failCtx = "In expression: " ++ show e ++ "\n"
-                        ++ "In statement: " ++ show stmt
-                addFault $ F.Fault F.Error failMsg failCtx
-                return S.TypeBottom 
+    let tyA = S.tagOfExpr typedA
+        tyB = S.tagOfExpr typedB
+        commonTypes = findCommonImplicitTypes [tyA, tyB]
 
-    return $ S.BinOpExpr op typedA typedB opType
+    let argType = if null commonTypes then S.TypeBottom else head commonTypes
+        opType = getOpType op argType
+
+    M.when (null commonTypes) $ do
+        let msg = "Incompatilbe types: '" ++ show tyA 
+                ++ "' and '" ++ show tyB ++ "' applied to operator '" 
+                ++ show op ++ "'."
+            ctx = "In expression: " ++ show e ++ "\n"
+                ++ "In statement: " ++ show stmt
+        addFault $ F.Fault F.Error msg ctx
+
+    M.when (length commonTypes > 1) $ do
+        let msg = "Ambiguous implicit type cast, casting to '" 
+                ++ show argType ++ "', all possible casts: " 
+                ++ show commonTypes
+            ctx = "In expression: " ++ show e ++ "\n"
+                ++ "In statement: " ++ show stmt
+        addFault $ F.Fault F.Warning msg ctx
+    
+    castedA <- castExprImplicitly argType typedA
+    castedB <- castExprImplicitly argType typedB
+
+    return $ S.BinOpExpr op castedA castedB opType
   where
     getOpType :: S.Operation -> S.Type -> S.Type
     getOpType op _ | op `elem` [S.Eq, S.Neq, S.Lt, S.Lte, S.Gt, S.Gte] = S.TypeBoolean

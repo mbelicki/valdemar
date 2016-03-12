@@ -274,10 +274,10 @@ isub :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 isub a b = instruction $ LLVM.Sub False False a b []
 
 imul :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
-imul a b = instruction $ LLVM.Add False False a b []
+imul a b = instruction $ LLVM.Mul False False a b []
 
 idiv :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
-idiv a b = instruction $ LLVM.Sub False False a b []
+idiv a b = instruction $ LLVM.SDiv True a b []
 
 intComparison :: LLVM.IntPred.IntegerPredicate
               -> LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
