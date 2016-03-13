@@ -6,7 +6,7 @@ module Syntax ( Name
               , Type(..)
               , isArray, isPointer, isArrayPointer, isFunction
               , ValueBinding(..), FunctionDeclaration(..)
-              , funDeclToType
+              , funDeclToType, nameOfFunDecl
               , Expression(..), tagOfExpr
               , Statement(..)
               ) where
@@ -70,12 +70,17 @@ printFloatingType n
     | n == 32   = "float_t"
     | otherwise = "float" ++ show n ++ "_t"
 
+printIntegerType n
+    | n == 64   = "int_t"
+    | n == 8    = "byte_t"
+    | otherwise = "int" ++ show n ++ "_t"
+
 showCommaSep :: Show a => [a] -> String
 showCommaSep = List.intercalate ", " . map show
 
 instance Show Type where
     show (TypeFloating n) = printFloatingType n
-    show (TypeInteger n) = "int" ++ show n ++ "_t"
+    show (TypeInteger n) = printIntegerType n
     show TypeBoolean = "bool_t"
     show TypeUnit = "unit_t"
     show (TypeArray t) = "[" ++ show t ++ "]"
@@ -105,8 +110,7 @@ isFunction :: Type -> Bool
 isFunction TypeFunction{} = True
 isFunction _ = False
 
-data ValueBinding
-    = ValBind BindingKind Name Type deriving (Eq, Ord)
+data ValueBinding = ValBind BindingKind Name Type deriving (Eq, Ord)
 
 showBindingKind :: BindingKind -> String
 showBindingKind Immutable = ""
@@ -121,6 +125,9 @@ data FunctionDeclaration
 funDeclToType :: FunctionDeclaration -> Type
 funDeclToType (FunDecl _ args retType)
     = TypeFunction (map (\(ValBind _ _ ty) -> ty) args) retType
+
+nameOfFunDecl :: FunctionDeclaration -> String
+nameOfFunDecl (FunDecl name _ _) = name
 
 data Expression tag
     = BooleanExpr Bool tag

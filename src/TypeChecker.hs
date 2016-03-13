@@ -33,6 +33,7 @@ data CheckerState
         , checkerLocalScope :: Scope
         , checkerFaults :: [F.Fault]
         , checkerLastStatement :: Maybe (S.Statement ())
+        , checkerCurrentFunction :: Maybe Decl
         }
 
 newtype TypeChecker a = TypeChecker { runTypeChecker :: State CheckerState a }
@@ -42,7 +43,7 @@ emptyScope :: Scope
 emptyScope = Scope [] [] Nothing
 
 emptyChecker :: CheckerState
-emptyChecker = CheckerState emptyScope emptyScope [] Nothing
+emptyChecker = CheckerState emptyScope emptyScope [] Nothing Nothing
 
 executeChecker :: TypeChecker a -> Either [F.Fault] (a, [F.Fault])
 executeChecker tc = if hasFailed then Left faults else Right (result, faults)
@@ -77,6 +78,20 @@ findInScope getter scope name
             maybeParentDecl = maybeParent >>= (\s -> findInScope getter s name)
 
 -- cheker state operations:
+
+beginFunction :: S.FunctionDeclaration -> TypeChecker ()
+beginFunction rawDecl = do 
+    let decl = (S.nameOfFunDecl rawDecl, S.funDeclToType rawDecl)
+    modify $ \s -> s { checkerCurrentFunction = Just decl }
+    pushScope
+
+endFunction :: TypeChecker ()
+endFunction = do 
+    popScope
+    modify $ \s -> s { checkerCurrentFunction = Nothing }
+
+getCurrentFunction :: TypeChecker (Maybe Decl)
+getCurrentFunction = gets checkerCurrentFunction
 
 -- add fault to fault list
 addFault :: F.Fault -> TypeChecker ()
@@ -265,13 +280,10 @@ canCastImplicitly t1@(S.TypeTuple name1 _) t2@(S.TypeTuple name2 _)
   where
     nameCompatible = name1 == "" || name2 == "" || name1 == name2
     fieldsCompatible = hasTheSameLayout t1 t2
--- allow to use single filed tuples as values of the filed's type
-canCastImplicitly t1@S.TypeTuple{} t2
-    -- = hasTheSameLayout t1 (S.TypeTuple "" [S.Field "" t2])
-    = canCastImplicitly (simplifyType t1) t2
-
+-- allow usage of single filed tuples as values of the filed's type
+canCastImplicitly t1@S.TypeTuple{} t2 = canCastImplicitly (simplifyType t1) t2
 canCastImplicitly (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
-canCastImplicitly a b = a == b
+canCastImplicitly _ _ = False
 
 castExprImplicitly :: S.Type -> S.Expression S.Type -> TypeChecker (S.Expression S.Type)
 castExprImplicitly desiredType typedExpr
@@ -294,8 +306,10 @@ findCommonImplicitTypes ts = List.nub $ filter (canCastTo ts) ts
   where
     simplified = map simplifyType ts
 
+    castableTo to from = not (needsCast from to) || canCastImplicitly from to
+
     canCastTo :: [S.Type] -> S.Type -> Bool
-    canCastTo ts t = all (`canCastImplicitly` t) ts
+    canCastTo ts t = all (castableTo t) ts
 
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
@@ -477,10 +491,10 @@ transformExpression e@(S.ElementOfExpr name index _) = do
     
     resType <- resolveType $ innerType arrayType
     return $ S.ElementOfExpr name castedIndex resType
-    where
-        innerType :: S.Type -> S.Type
-        innerType (S.TypePointer (S.TypeArray t)) = t
-        innerType _ = S.TypeBottom
+  where
+    innerType :: S.Type -> S.Type
+    innerType (S.TypePointer (S.TypeArray t)) = t
+    innerType _ = S.TypeBottom
 
 transformExpression (S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
     valueTy <- resolveType t
@@ -500,12 +514,12 @@ transformExpression (S.ValDestructuringExpr bindings rawValue _) = do
 
 -- function declarations:
 transformExpression (S.FunDeclExpr funDecl stmt _) = do
-    pushScope
-    
+    beginFunction funDecl
+
     declareArguments funDecl
     typedStmt <- transformStatement stmt
     
-    popScope
+    endFunction
 
     decl <- resolveFunDecl funDecl
     let ty = S.funDeclToType decl
@@ -535,8 +549,27 @@ brachCond cond = transformExpression cond >>= castExprImplicitly S.TypeBoolean
 transformStatement :: S.Statement () -> TypeChecker (S.Statement S.Type)
 transformStatement s@(S.ReturnStmt rawExpr) = do
     setCurrentStatement s
-    typedExpr <- transformExpression rawExpr
+    maybeFunDecl <- getCurrentFunction
+    M.unless (Maybe.isJust maybeFunDecl) $ do
+        let msg = "Cannot use return statement outside function definition."
+        createFault F.Error msg ""
+    
+    let funName = maybe "" fst maybeFunDecl
+        funType = maybe S.TypeBottom snd maybeFunDecl
+
+    retType <- resolveType $ getRetType funType
+    M.when (retType == S.TypeUnit) $ do
+        let msg = "Cannot use return statement in function returning 'unit_t'."
+            ctx = "Function '" ++ funName ++ "' is declared as: '" 
+                  ++ show funType ++ "'"
+        createFault F.Error msg ctx
+
+    typedExpr <- transformExpression rawExpr >>= castExprImplicitly retType
     return $ S.ReturnStmt typedExpr
+  where
+    getRetType :: S.Type -> S.Type
+    getRetType (S.TypeFunction _ t) = t
+    getRetType _ = S.TypeBottom
 
 transformStatement s@(S.ExpressionStmt rawExpr) = do
     setCurrentStatement s
@@ -545,7 +578,9 @@ transformStatement s@(S.ExpressionStmt rawExpr) = do
     
 transformStatement s@(S.BlockStmt rawStmts) = do
     setCurrentStatement s
+    pushScope
     typedStmts <- M.forM rawStmts transformStatement
+    popScope
     return $ S.BlockStmt typedStmts
 
 transformStatement s@(S.IfStmt rawCondition rawBody) = do

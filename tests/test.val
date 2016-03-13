@@ -226,6 +226,7 @@ fn implicit_casts() -> unit_t {
     val k double_t = 2 * 1 / i + sq(8 - 6)
     print_float(k)
     print_char('\n')
+    --return "hello"
 }
 
 fn main () -> unit_t {
