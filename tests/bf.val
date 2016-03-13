@@ -2,12 +2,12 @@
 ext_c print_char (c byte_t) -> unit_t
 ext_c get_char () -> byte_t
 
-fn interpret (prog ^[byte_t]) -> unit_t {
-    mutval tape ^[byte_t] = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-    mutval tape_index int_t = 0
+fn interpret (prog str_t) -> unit_t {
+    val !tape ^[byte_t] = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+    val !tape_index int_t = 0
 
-    mutval i int_t = 0
-    mutval loop int_t = 0
+    val !i int_t = 0
+    val !loop int_t = 0
 
     while i < #prog {
         val c byte_t = prog[i]
