@@ -78,10 +78,20 @@ findInScope getter scope name
 
 -- cheker state operations:
 
+-- add fault to fault list
 addFault :: F.Fault -> TypeChecker ()
 addFault f = do
     fs <- gets checkerFaults
     modify $ \s -> s { checkerFaults = f : fs }
+
+-- create and add fault with standard format of context part
+createFault :: F.FaultLevel -> String -> String -> TypeChecker ()
+createFault level message contextStart = do
+    maybeStmt <- getLastStatement
+    let stmtPart = maybe "" (\s -> "In statement: '" ++ show s ++ "'") maybeStmt
+        context = contextStart ++ "\n" ++ stmtPart
+    addFault $ F.Fault level message context
+
 
 setCurrentStatement :: S.Statement () -> TypeChecker ()
 setCurrentStatement stmt = modify $ \s -> s { checkerLastStatement = Just stmt }
@@ -258,8 +268,7 @@ castExprImplicitly desiredType typedExpr
      | not castNeeded = return typedExpr
      | castPossible = return $ S.CastExpr desiredType typedExpr desiredType
      | otherwise = do
-        stmt <- getLastStatement
-        addFault $ makeFault stmt
+        createFault F.Error failMsg failCtx
         return typedExpr
   where
     actualType = S.tagOfExpr typedExpr
@@ -267,14 +276,8 @@ castExprImplicitly desiredType typedExpr
     castPossible = canCastImplicitly actualType desiredType
 
     failMsg = "Cannot implicitly cast: '" ++ show actualType ++ "' to '" 
-        ++ show desiredType ++ "'"
-
-    failExpr = "Casted expression: '" ++ show typedExpr ++ "'\n"
-
-    failStmt Nothing = ""
-    failStmt (Just s) = "In statement: '" ++ show s ++ "'"
-
-    makeFault s = F.Fault F.Error failMsg (failExpr ++ failStmt s)
+        ++ show desiredType ++ "'."
+    failCtx = "Casted expression: '" ++ show typedExpr ++ "'"
 
 findCommonImplicitTypes :: [S.Type] -> [S.Type]
 findCommonImplicitTypes ts = List.nub $ filter (canCastTo ts) ts
@@ -303,9 +306,7 @@ transformExpression e@(S.ArrayExpr rawItems _) = do
     return $ S.ArrayExpr items $ S.TypePointer $ S.TypeArray arrayBaseType
   where
     failMsg = "Mismatched types in literal array declaration."
-    failCtx s = "In expression: '" ++ show e ++ "'\n"
-        ++ "In statement: '" ++ show s ++ "'"
-    makeFault s = F.Fault F.Error failMsg $ failCtx s
+    failCtx = "In expression: '" ++ show e ++ "'"
 
     checkItemType :: S.Type -> Maybe S.Type -> Maybe S.Type
     checkItemType ta (Just tb) = if ta == tb then Just ta else Nothing
@@ -317,8 +318,7 @@ transformExpression e@(S.ArrayExpr rawItems _) = do
         case maybeTypes of
             (Just ts) -> return ts
             Nothing   -> do
-                stmt <- getLastStatement
-                addFault $ makeFault stmt
+                createFault F.Error failMsg failCtx
                 return S.TypeBottom
 
 -- tuple literal:
@@ -369,12 +369,10 @@ transformExpression (S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
     findField fields name = find (\(S.Field nm _) -> nm == name) fields
 
 transformExpression e@(S.BinOpExpr S.MemberOf argA argB _) = do
-    stmt <- getLastStatement
     let failMsg = "Cannot use: '" ++ show argB 
-            ++ "' as subscript to: '" ++ show argA ++ "'"
-        failCtx = "In expression: " ++ show e ++ "\n"
-            ++ "In statement: " ++ show stmt
-    addFault $ F.Fault F.Error failMsg failCtx
+            ++ "' as subscript to: '" ++ show argA ++ "'."
+        failCtx = "In expression: '" ++ show e ++ "'"
+    createFault F.Error failMsg failCtx
     -- check any way, perhaps there are some more issues to report:
     typedArgA <- transformExpression argA
     typedArgB <- transformExpression argB
@@ -385,7 +383,6 @@ transformExpression e@(S.BinOpExpr op argA argB _) = do
     typedA <- transformExpression argA
     typedB <- transformExpression argB
     
-    stmt <- getLastStatement
     let tyA = S.tagOfExpr typedA
         tyB = S.tagOfExpr typedB
         commonTypes = findCommonImplicitTypes [tyA, tyB]
@@ -397,17 +394,15 @@ transformExpression e@(S.BinOpExpr op argA argB _) = do
         let msg = "Incompatilbe types: '" ++ show tyA 
                 ++ "' and '" ++ show tyB ++ "' applied to operator '" 
                 ++ show op ++ "'."
-            ctx = "In expression: " ++ show e ++ "\n"
-                ++ "In statement: " ++ show stmt
-        addFault $ F.Fault F.Error msg ctx
+            ctx = "In expression: '" ++ show e ++ "'"
+        createFault F.Error msg ctx
 
     M.when (length commonTypes > 1) $ do
         let msg = "Ambiguous implicit type cast, casting to '" 
                 ++ show argType ++ "', all possible casts: " 
                 ++ show commonTypes
-            ctx = "In expression: " ++ show e ++ "\n"
-                ++ "In statement: " ++ show stmt
-        addFault $ F.Fault F.Warning msg ctx
+            ctx = "In expression: '" ++ show e ++ "'"
+        createFault F.Warning msg ctx
     
     castedA <- castExprImplicitly argType typedA
     castedB <- castExprImplicitly argType typedB
@@ -426,8 +421,6 @@ transformExpression (S.VarExpr name _) = do
     return $ S.VarExpr name resType
 
 transformExpression e@(S.CallExpr name args _) = do
-    stmt <- getLastStatement
-
     let declFail = error $ "Unknown function: " ++ name
 
     decl <- Maybe.fromMaybe declFail <$> findDecl name
@@ -437,8 +430,8 @@ transformExpression e@(S.CallExpr name args _) = do
         castExprImplicitly ty typed
     
     actualArgTypes <- M.mapM (resolveType . S.tagOfExpr) typedArgs
-    unless (actualArgTypes == expectedArgTypes) $
-        addFault $ makeArgTypeFault expectedArgTypes actualArgTypes stmt
+    M.unless (actualArgTypes == expectedArgTypes) $
+        createFault F.Error failArgTypeMsg $ failArgTypeCtx expectedArgTypes actualArgTypes
 
     resType <- resolveType $ getReturnType $ snd decl
     return $ S.CallExpr name typedArgs resType
@@ -449,13 +442,10 @@ transformExpression e@(S.CallExpr name args _) = do
     getArgTypes :: S.Type -> [S.Type]
     getArgTypes (S.TypeFunction args _) = args
 
-    failArgTypeMsg = "Mismatched argument types in call of function: " ++ name
-    failArgTypeCtx exp act s = "Expected types: " ++ show exp ++ "\n"
-                            ++ "Actual type:    " ++ show act ++ "\n"
-                            ++ "In expression: " ++ show e ++ "\n"
-                            ++ "In statement: " ++ show s
-    makeArgTypeFault exp act s 
-        = F.Fault F.Error failArgTypeMsg $ failArgTypeCtx exp act s
+    failArgTypeMsg = "Mismatched argument types in call of function '" ++ name ++ "'."
+    failArgTypeCtx exp act = "Expected types: '" ++ show exp ++ "'\n"
+                          ++ "Actual type:    '" ++ show act ++ "'\n"
+                          ++ "In expression:  '" ++ show e ++ "'"
 
 transformExpression (S.ElementOfExpr name index _) = do
     typedIndex <- transformExpression index
