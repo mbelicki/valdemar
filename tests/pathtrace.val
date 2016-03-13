@@ -31,7 +31,7 @@ fn vec3_scale (a vec3_t, k double_t) -> vec3_t {
 fn vec3_normalize(a vec3_t) -> vec3_t {
     val (x, y, z double_t) = a
     val len double_t = x * x + y * y + z * z
-    val k double_t = 1.0 / sqrt(len)
+    val k double_t = 1 / sqrt(len)
     return vec3_scale(a, k)
 }
 
@@ -44,10 +44,10 @@ fn vec3_cross (a, b vec3_t) -> vec3_t {
 }
 
 fn vec3_lerp (a, b vec3_t, k double_t) -> vec3_t {
-    if k <= 0.0 return a
-    if k >= 1.0 return b
+    if k <= 0 return a
+    if k >= 1 return b
 
-    val nk double_t = 1.0 - k
+    val nk double_t = 1 - k
     val out vec3_t = (0, 0, 0)
     out.x = a.x * nk + b.x * k
     out.y = a.y * nk + b.y * k
@@ -92,7 +92,7 @@ fn clamp (x double_t) -> double_t {
 
 fn intersects_any 
         (ray ^ray_t, spheres ^[sphere_t]) -> (bool_t, double_t, int_t) {
-    val inf double_t = 1000000000.0 -- TODO: valemar needs demical separators
+    val inf double_t = 1000000000 -- TODO: valemar needs demical separators
 
     val !t  double_t = inf
     val !id int_t = 0
@@ -134,7 +134,7 @@ fn get_random_signed() -> double_t { -- random from unifrom range of [-1, 1]
 fn reflect (ray ^ray_t, hit_point, hit_normal vec3_t, roughness double_t) -> ray_t {
     val PI double_t = 3.1415
     -- pure specular reflection vector
-    val nod double_t = 2.0 * vec3_dot(hit_normal, ray->direction)
+    val nod double_t = 2 * vec3_dot(hit_normal, ray->direction)
     val refl_dir vec3_t = vec3_sub(ray->direction, vec3_scale(hit_normal, nod))
     if roughness < 0.0001 {
         return (hit_point, refl_dir)
@@ -177,7 +177,7 @@ fn radiance (ray ^ray_t, spheres ^[sphere_t], depth int_t) -> vec3_t {
     val n vec3_t = vec3_normalize(vec3_sub(x, obj->position)) -- normal
 
     val !nl vec3_t = n 
-    if vec3_dot(n, ray->direction) >= 0.0 {
+    if vec3_dot(n, ray->direction) >= 0 {
         nl = vec3_scale(n, -1.0)
     }
     
@@ -216,7 +216,7 @@ fn print_ppm_header (width, height int_t) -> unit_t {
 }
 
 fn correct_gamma (x double_t) -> int_t {
-    return int_t(pow(clamp(x), 1.0 / 2.2) * 255.0 + 0.5)
+    return int_t(pow(clamp(x), 1 / 2.2) * 255 + 0.5)
 }
 
 fn print_color (color vec3_t) -> unit_t {
@@ -256,14 +256,14 @@ fn main () -> unit_t {
     -- TODO: fix when more loops are available
     val (!x, !y, !i int_t) = (0, 0, 0)
     val (!nx, !ny, !rnx, !rny double_t) = (0.0, 0.0, 0.0, 0.0)
-    val (dx, dy double_t) = (0.7 / double_t(width), 0.7 / double_t(height)) -- pixel size
+    val (dx, dy double_t) = (0.7 / width, 0.7 / height) -- pixel size
     val color vec3_t = (0, 0, 0)
     val ray ray_t = ((0, 0, 0), (0, 0, 0))
     while y < height {
         x = 0
-        ny = double_t(y) / double_t(height)
+        ny = y / double_t(height)
         while x < width {
-            nx = double_t(x) / double_t(width)
+            nx = x / double_t(width)
 
             i = 0
             color.x = 0
@@ -277,7 +277,7 @@ fn main () -> unit_t {
                 i = i + 1
             }
 
-            print_color(vec3_scale(color, 1.0 / double_t(samples)))
+            print_color(vec3_scale(color, 1.0 / samples))
             x = x + 1
         }
         y = y + 1
