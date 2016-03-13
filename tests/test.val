@@ -226,10 +226,18 @@ fn implicit_casts() -> unit_t {
     val k double_t = 2 * 1 / i + sq(8 - 6)
     print_float(k)
     print_char('\n')
-    --return "hello"
+}
+
+-- shadowing is of course impossible
+fn shadowing () -> unit_t {
+    val a int_t = 1
+    if true {
+        -- val a int_t = 2
+        print_int(a)
+    }
 }
 
 fn main () -> unit_t {
-    implicit_casts()
+    shadowing()
 }
 

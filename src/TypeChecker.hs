@@ -12,8 +12,8 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Applicative
 
-import Data.Maybe as Maybe
-import Data.List as List
+import qualified Data.Maybe as Maybe
+import qualified Data.List as List
 
 -- udnderlying data types and state setup
 
@@ -73,7 +73,7 @@ findInScope getter scope name
         where
             maybeParent = scopeParent scope
             decls = getter scope
-            maybeDecl = find (\(n, _) -> n == name) decls
+            maybeDecl = List.find (\(n, _) -> n == name) decls
 
             maybeParentDecl = maybeParent >>= (\s -> findInScope getter s name)
 
@@ -202,8 +202,8 @@ findGlobals s = buildScope decls aliases
             = Just (name, S.TypeTuple name $ fieldsToTypes fileds)
         tupleToAlias _ = Nothing
 
-        decls = mapMaybe funcToDecl s
-        aliases = mapMaybe tupleToAlias s
+        decls = Maybe.mapMaybe funcToDecl s
+        aliases = Maybe.mapMaybe tupleToAlias s
 
         buildScope :: [Decl] -> [TypeAlias] -> Scope
         buildScope decls aliases
@@ -395,7 +395,7 @@ transformExpression e@(S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
     return $ S.BinOpExpr S.MemberOf typed (S.VarExpr name resType) resType
   where
     findField :: [S.TupleFiled] -> S.Name -> Maybe S.TupleFiled
-    findField fields name = find (\(S.Field nm _) -> nm == name) fields
+    findField fields name = List.find (\(S.Field nm _) -> nm == name) fields
 
 transformExpression e@(S.BinOpExpr S.MemberOf argA argB _) = do
     let failMsg = "Cannot use: '" ++ show argB 
@@ -496,7 +496,14 @@ transformExpression e@(S.ElementOfExpr name index _) = do
     innerType (S.TypePointer (S.TypeArray t)) = t
     innerType _ = S.TypeBottom
 
-transformExpression (S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
+transformExpression e@(S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
+    alreadyExists <- Maybe.isJust <$> findDecl name
+    M.when alreadyExists $ do
+        let msg = "Variable '" ++ name 
+                  ++ "' has already been defined in current scope."
+            ctx = "Second declaration: '" ++ show e ++ "'"
+        createFault F.Error msg ctx
+
     valueTy <- resolveType t
     typedValue <- transformExpression rawValue >>= castExprImplicitly valueTy
     addLocalDecl (name, valueTy)
