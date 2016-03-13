@@ -4,7 +4,7 @@ module Syntax ( Name
               , BitCount
               , TupleFiled(Field)
               , Type(..)
-              , isArray, isPointer, isArrayPointer
+              , isArray, isPointer, isArrayPointer, isFunction
               , ValueBinding(..), FunctionDeclaration(..)
               , funDeclToType
               , Expression(..), tagOfExpr
@@ -90,16 +90,20 @@ instance Show Type where
     show TypeBottom = "_bottom_"
 
 isArray :: Type -> Bool
-isArray (TypeArray _) = True
+isArray TypeArray{} = True
 isArray _ = False
 
 isPointer :: Type -> Bool
-isPointer (TypePointer _) = True
+isPointer TypePointer{} = True
 isPointer _ = False
 
 isArrayPointer :: Type -> Bool
 isArrayPointer (TypePointer ty) = isArray ty
 isArrayPointer _ = False
+
+isFunction :: Type -> Bool
+isFunction TypeFunction{} = True
+isFunction _ = False
 
 data ValueBinding
     = ValBind BindingKind Name Type deriving (Eq, Ord)

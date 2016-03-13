@@ -137,6 +137,16 @@ findDecl name = do
         maybeGlobal = findDeclInScope globalScope name
     return $ if Maybe.isJust maybeLocal then maybeLocal else maybeGlobal
 
+-- adds a fault and returns bottom if variable is not defined
+fetchDeclType :: S.Name -> S.Expression a -> TypeChecker S.Type
+fetchDeclType name e = do
+    maybeDecl <- findDecl name
+    M.unless (Maybe.isJust maybeDecl) $ do
+        let msg = "Unknown variable: '" ++ name ++ "'."
+            ctx = "In expression: '" ++ show e ++ "'"
+        createFault F.Error msg ctx
+    return $ maybe S.TypeBottom snd maybeDecl
+
 isTuple :: S.Type -> Bool
 isTuple (S.TypeTuple _ _) = True
 isTuple _ = False
@@ -347,20 +357,25 @@ transformExpression (S.BinOpExpr S.DeRefMemberOf arg member _) = do
         expr = S.BinOpExpr S.MemberOf newArg member ()
     transformExpression expr
 
-transformExpression (S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
+transformExpression e@(S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
     typed <- transformExpression arg
     ty <- resolveType $ S.tagOfExpr typed
+    let failContext = "In expression: '" ++ show e ++ "'"
 
-    unless (isTuple ty) $ error $ "Cannot access member of: '" 
-        ++ show arg ++ "', expression is not a tuple."
+    M.unless (isTuple ty) $ do
+        let msg = "Cannot access member of: '" ++ show arg 
+                  ++ "', expression is not a tuple."
+        createFault F.Error msg failContext
     
-    let S.TypeTuple tupleName fields = ty
+    let S.TypeTuple tupleName fields = if isTuple ty then ty else S.TypeTuple "" []
         maybeField = findField fields name
 
-    unless (Maybe.isJust maybeField) $ error $ "Tuple '" ++ tupleName 
-        ++ "' does not contain field: '" ++ name ++ "'"
+    M.unless (Maybe.isJust maybeField) $ do 
+        let msg = "Tuple '" ++ tupleName ++ "' does not contain field: '" 
+                  ++ name ++ "'."
+        createFault F.Error msg failContext
 
-    let Just (S.Field fName fType) = maybeField
+    let S.Field fName fType = Maybe.fromMaybe (S.Field "" S.TypeBottom) maybeField
     resType <- resolveType fType
     
     return $ S.BinOpExpr S.MemberOf typed (S.VarExpr name resType) resType
@@ -414,17 +429,18 @@ transformExpression e@(S.BinOpExpr op argA argB _) = do
     getOpType _ argType = argType
 
 -- based on defined symbols:
-transformExpression (S.VarExpr name _) = do
-    let fail = error $ "Unknown variable: " ++ name
-    decl <- Maybe.fromMaybe fail <$> findDecl name
-    resType <- resolveType $ snd decl
+transformExpression e@(S.VarExpr name _) = do
+    resType <- fetchDeclType name e >>= resolveType
     return $ S.VarExpr name resType
 
 transformExpression e@(S.CallExpr name args _) = do
-    let declFail = error $ "Unknown function: " ++ name
+    funType <- fetchDeclType name e
 
-    decl <- Maybe.fromMaybe declFail <$> findDecl name
-    expectedArgTypes <- M.mapM resolveType $ getArgTypes $ snd decl
+    unless (S.isFunction funType) $ do
+        let msg = "Variable '" ++ name ++ "' is not a function."
+        createFault F.Error msg exprCtx
+
+    expectedArgTypes <- M.mapM resolveType $ getArgTypes funType
     typedArgs <- M.forM (zip args expectedArgTypes) $ \(expr, ty) -> do 
         typed <- transformExpression expr
         castExprImplicitly ty typed
@@ -433,38 +449,38 @@ transformExpression e@(S.CallExpr name args _) = do
     M.unless (actualArgTypes == expectedArgTypes) $
         createFault F.Error failArgTypeMsg $ failArgTypeCtx expectedArgTypes actualArgTypes
 
-    resType <- resolveType $ getReturnType $ snd decl
+    resType <- resolveType $ getReturnType funType
     return $ S.CallExpr name typedArgs resType
   where
+    exprCtx = "In expression: '" ++ show e ++ "'"
+
     getReturnType :: S.Type -> S.Type
     getReturnType (S.TypeFunction _ ret) = ret
+    getReturnType _ = S.TypeBottom
 
     getArgTypes :: S.Type -> [S.Type]
     getArgTypes (S.TypeFunction args _) = args
+    getArgTypes _ = []
 
     failArgTypeMsg = "Mismatched argument types in call of function '" ++ name ++ "'."
     failArgTypeCtx exp act = "Expected types: '" ++ show exp ++ "'\n"
                           ++ "Actual type:    '" ++ show act ++ "'\n"
-                          ++ "In expression:  '" ++ show e ++ "'"
+                          ++ exprCtx
 
-transformExpression (S.ElementOfExpr name index _) = do
-    typedIndex <- transformExpression index
-    let indexType = S.tagOfExpr typedIndex
-    -- check if index has correct type
-
-    --let castedIndex = if needsCast indexType (S.TypeInteger 64)
-    castedIndex <- castExprImplicitly (S.TypeInteger 64) typedIndex
-
-    let declFail = error $ "Unknown array: " ++ name
-    arrayDecl <- Maybe.fromMaybe declFail <$> findDecl name
-    -- check if array declaration from current scope has correct type
-    M.unless (S.isArrayPointer $ snd arrayDecl) $ error $ name ++ " is not array pointer."
+transformExpression e@(S.ElementOfExpr name index _) = do
+    castedIndex <- castExprImplicitly (S.TypeInteger 64) =<< transformExpression index
+    arrayType <- fetchDeclType name e
+    M.unless (S.isArrayPointer arrayType) $ do 
+        let msg = "Variable '" ++ name ++ "' is not an array pointer."
+            ctx = "In expression: '" ++ show e ++ "'"
+        createFault F.Error msg ctx
     
-    resType <- resolveType $ innerType $ snd arrayDecl
+    resType <- resolveType $ innerType arrayType
     return $ S.ElementOfExpr name castedIndex resType
     where
         innerType :: S.Type -> S.Type
         innerType (S.TypePointer (S.TypeArray t)) = t
+        innerType _ = S.TypeBottom
 
 transformExpression (S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
     valueTy <- resolveType t
