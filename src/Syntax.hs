@@ -11,7 +11,8 @@ module Syntax ( Name
               , Statement(..)
               ) where
 
-import Data.List as List
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 
 type Name = String
 
@@ -137,12 +138,30 @@ data Expression tag
     | CastExpr Type (Expression tag) tag
     deriving (Eq, Ord)
 
+isCharLiteral :: Expression a -> Bool
+isCharLiteral CharacterExpr{} = True
+isCharLiteral _ = False
+
+isStringLiteral :: Expression a -> Bool
+isStringLiteral (ArrayExpr es _) = all isCharLiteral es
+isStringLiteral _ = False
+
+getLiteralChar :: Expression a -> Maybe Char
+getLiteralChar (CharacterExpr c _) = Just c
+getLiteralChar _ = Nothing
+
+getLiteralString :: Expression a -> String
+getLiteralString (ArrayExpr es _) = Maybe.mapMaybe getLiteralChar es
+getLiteralString _ = ""
+
 instance Show (Expression a) where
     show (BooleanExpr b _) = if b then "true" else "false"
     show (IntegerExpr i _) = show i
-    show (CharacterExpr c _) = "'" ++ show c ++ "'"
+    show (CharacterExpr c _) = show c
     show (FloatExpr d _) = show d
-    show (ArrayExpr es _) = "[" ++ showCommaSep es ++ "]" 
+    show e@(ArrayExpr es _) 
+        | isStringLiteral e = "\"" ++ getLiteralString e ++ "\""
+        | otherwise = "[" ++ showCommaSep es ++ "]" 
     show (AnonTupleExpr es _) = "(" ++ showCommaSep es ++ ")" 
     show (PrefixOpExpr op e _) =  show op ++ show e
     show (BinOpExpr op e1 e2 _) = show e1 ++ " " ++  show op ++ " " ++ show e2
