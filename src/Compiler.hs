@@ -206,6 +206,9 @@ linkAll outName objectPaths
             osxArgs = [ "/usr/lib/crt1.o", "-arch", "x86_64"
                       , "-macosx_version_min", "10.11", "-lSystem"
                       ]
+	    gnuArgs = [ "-dynamic-linker", "/lib/ld-linux.so.2"
+                      , "/usr/lib/i386-linux-gnu/crti.o", "/usr/lib/i386-linux-gnu/crt1.o"
+                      , "-lc", "-lm", "/usr/lib/i386-linux-gnu/crtn.o" ]
             output = ["-o", outName]
 
 compile :: CompilerOptions -> [String] -> IO ()
