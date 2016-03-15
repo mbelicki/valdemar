@@ -10,6 +10,7 @@ import qualified LLVM.General.AST.CallingConvention as LLVM.CallConv
 import qualified LLVM.General.AST.IntegerPredicate as LLVM.IntPred
 import qualified LLVM.General.AST.FloatingPointPredicate as LLVM.FloatPred
 
+import Data.Word
 import qualified Data.Map as Map
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe

@@ -38,6 +38,8 @@ import qualified System.Directory as Dir
 import qualified System.Process as Proc
 import qualified System.Exit as Exit
 
+import Control.Applicative
+
 data OutputType = OutExecutable
                 | OutObjectFile
                 | OutTargetAssembly

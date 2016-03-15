@@ -21,6 +21,8 @@ import qualified Data.Word as Word
 import qualified Data.Map as Map
 import qualified Data.Int as Int
 
+import Control.Applicative
+
 arrayIndexType :: LLVM.Type
 arrayIndexType = LLVM.IntegerType 32 
 
