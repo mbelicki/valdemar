@@ -37,6 +37,7 @@ import qualified Data.Map as Map
 import qualified System.Directory as Dir
 import qualified System.Process as Proc
 import qualified System.Exit as Exit
+import qualified System.Info as Info
 
 import Control.Applicative
 
@@ -202,7 +203,8 @@ linkAll :: String -> [String] -> IO ()
 linkAll outName objectPaths
     = Proc.callProcess "ld" args
         where 
-            args = objectPaths ++ osxArgs ++ output
+            args = objectPaths ++ ldArgs ++ output
+	    ldArgs = if Info.os == "linux" then gnuArgs else osxArgs
             osxArgs = [ "/usr/lib/crt1.o", "-arch", "x86_64"
                       , "-macosx_version_min", "10.11", "-lSystem"
                       ]
