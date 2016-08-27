@@ -4,7 +4,7 @@ valdemar
 valdemar is a small experimental programming language, here is a short code
 snippet: 
 
-```
+```lua
 -- comments start with dobule dash
 ext_c sin (a double_t) -> double_t -- declare external C function
 ext_c cos (a double_t) -> double_t
