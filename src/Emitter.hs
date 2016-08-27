@@ -255,6 +255,12 @@ emitExprForAddress (S.BinOpExpr S.MemberOf n (S.VarExpr name _) ty) = do
     getFieldOffset :: [S.TupleFiled] -> S.Name -> Maybe Int
     getFieldOffset fields name = List.findIndex (\(S.Field nm _) -> nm == name) fields
 
+emitExprForAddress n@(S.CallExpr _ _ ty) = do
+    op <- emitExprForValue n
+    ptr <- CG.alloca $ getLLVMType ty
+    CG.store ptr op
+    return ptr
+
 emitExprForAddress e = error ("Critical error: emitting for address: '" ++ show e 
                         ++ "' of type: '" ++ show (S.tagOfExpr e) ++ "'")
 
@@ -350,7 +356,6 @@ emitExprForValue (S.CastExpr targetType n _) = do
           Nothing -> error $ "Conversion is missing: " 
               ++ show innerType ++ " to " ++ show outerType
           Just instr -> instr (getLLVMType outerType) op
-
 
 emitExprForValue (S.CallExpr fun args ty) = do
     argSymbols <- M.mapM emitExprForValue args

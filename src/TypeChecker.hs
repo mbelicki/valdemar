@@ -455,6 +455,11 @@ transformExpression e@(S.CallExpr name args _) = do
         createFault F.Error msg exprCtx
 
     expectedArgTypes <- M.mapM resolveType $ getArgTypes funType
+    let expArgsCount = length expectedArgTypes
+        argsCount = length args
+    M.unless (expArgsCount == argsCount) $
+        createFault F.Error failArgCountMsg $ failArgCountCtx expArgsCount argsCount
+
     typedArgs <- M.forM (zip args expectedArgTypes) $ \(expr, ty) -> do 
         typed <- transformExpression expr
         castExprImplicitly ty typed
@@ -476,6 +481,8 @@ transformExpression e@(S.CallExpr name args _) = do
     getArgTypes (S.TypeFunction args _) = args
     getArgTypes _ = []
 
+    failArgCountMsg = "Wrong argument count in call of function '" ++ name ++ "'."
+    failArgCountCtx n m = "Expected " ++ show n ++ " arguments, received " ++ show m ++ ".\n" ++ exprCtx
     failArgTypeMsg = "Mismatched argument types in call of function '" ++ name ++ "'."
     failArgTypeCtx exp act = "Expected types: '" ++ show exp ++ "'\n"
                           ++ "Actual type:    '" ++ show act ++ "'\n"
