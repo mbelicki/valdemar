@@ -208,8 +208,9 @@ checkFiles paths = do
     let notExisting = Maybe.catMaybes results
     return (null notExisting, notExisting)
 
-linkAll :: String -> [String] -> IO (Bool, [F.Fault])
-linkAll outName objectPaths = do
+linkAll :: String -> [String] -> CompilerOptions -> IO (Bool, [F.Fault])
+linkAll outName objectPaths options = do
+    M.when (compilerVerbose options) $ putStrLn ("Linking: " ++ outName)
     let requiredFiles = case Info.os of
                     "linux" -> ["/lib/ld-linux.so.2", "/usr/lib/i386-linux-gnu/crti.o"
                                , "/usr/lib/i386-linux-gnu/crt1.o", "/usr/lib/i386-linux-gnu/crtn.o"
@@ -255,7 +256,7 @@ compile options files = do
     M.when (outputType == OutExecutable && not somethingFailed) $ do
         let allObjects = objects ++ map (++ ".o") sources
         let outName = compilerOutputName options
-        (_, faults) <- linkAll outName allObjects
+        (_, faults) <- linkAll outName allObjects options
         printFaults faults
 
     M.when (outputType == OutExecutable && somethingFailed) $ do
