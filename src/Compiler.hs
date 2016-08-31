@@ -199,17 +199,14 @@ buildSource filePath options = do
 
         compileMessage = "Compiling: '" ++ filePath ++ "' -> '" ++ outPath ++ "'"
 
-checkFiles :: [String] -> IO (Bool, [F.Fault])
+checkFiles :: [String] -> IO (Bool, [String])
 checkFiles paths = do
     results <- M.forM paths $ \path -> do
         exists <- Dir.doesFileExist path 
         return $ if exists then Nothing else Just path
     
     let notExisting = Maybe.catMaybes results
-        makeFault path = F.Fault F.Error "Cannot access file." $ "Path: " ++ path
-        faults = map makeFault notExisting
-    
-    return (null notExisting, faults)
+    return (null notExisting, notExisting)
 
 linkAll :: String -> [String] -> IO (Bool, [F.Fault])
 linkAll outName objectPaths = do
@@ -220,8 +217,8 @@ linkAll outName objectPaths = do
                     "darwin" -> ["/usr/lib/crt1.o"]
                     _ -> []
 
-    (ok, faults) <- checkFiles requiredFiles
-    M.when ok $ do
+    (ok, notExisting) <- checkFiles requiredFiles
+    if ok then do
         let args = objectPaths ++ ldArgs ++ output
             ldArgs = if Info.os == "linux" then gnuArgs else osxArgs
             osxArgs = [ "/usr/lib/crt1.o", "-arch", "x86_64"
@@ -232,9 +229,17 @@ linkAll outName objectPaths = do
                       , "-lc", "-lm", "/usr/lib/i386-linux-gnu/crtn.o"
                       ]
             output = ["-o", outName]
-        Proc.callProcess "ld" args
+        --Proc.callProcess "ld" args
+        (code, stdout, stderr) <- Proc.readProcessWithExitCode "ld" args ""
+        let success = code == Exit.ExitSuccess
+            reason = "Command: ld " ++ (concat $ List.intersperse " " args)
+                  ++ "\nstdout:\n" ++ stdout
+                  ++ "\nstderr:\n" ++ stderr
+        return (success, if success then [] else [F.Fault F.Error "Linking failed." reason])
+    else do
+        let reason = "Cannot access following files:\n" ++ (concat $ List.intersperse "\n" notExisting)
+        return (False, [F.Fault F.Error "Linking failed." reason])
 
-    return (ok, faults)
 
 compile :: CompilerOptions -> [String] -> IO ()
 compile options files = do
