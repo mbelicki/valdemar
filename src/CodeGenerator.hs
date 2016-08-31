@@ -4,6 +4,7 @@ module CodeGenerator where
 
 import qualified LLVM.General.AST as LLVM
 import qualified LLVM.General.AST.Global as LLVM.Global
+import qualified LLVM.General.AST.Linkage as LLVM.Linkage
 import qualified LLVM.General.AST.Constant as LLVM.Const
 import qualified LLVM.General.AST.Attribute as LLVM.Attr
 import qualified LLVM.General.AST.CallingConvention as LLVM.CallConv
@@ -62,6 +63,14 @@ addDef d = do
     defs <- gets LLVM.moduleDefinitions
     modify $ \s -> s { LLVM.moduleDefinitions = defs ++ [d] }
 
+isGlobalDefined :: String -> ModuleBuilder Bool
+isGlobalDefined name = do
+    defs <- gets LLVM.moduleDefinitions
+    let checkDef def = case def of
+            (LLVM.GlobalDefinition g) -> LLVM.Global.name g == LLVM.Name name
+            _ -> False
+    return $ any checkDef defs
+
 makeParam :: Argument -> LLVM.Parameter
 makeParam (t, n, _) = LLVM.Parameter t n []
 
@@ -72,22 +81,15 @@ define :: LLVM.Type -> String -> [Argument] -> [LLVM.BasicBlock] -> ModuleBuilde
 define returnType label arguments body
     = addDef $ LLVM.GlobalDefinition $ LLVM.functionDefaults
         { LLVM.Global.name        = LLVM.Name label
+        , LLVM.Global.linkage     = LLVM.Linkage.External
         , LLVM.Global.parameters  = (params, False)
         , LLVM.Global.returnType  = returnType
         , LLVM.Global.basicBlocks = body
         } where
             params = map makeParam arguments
 
--- hmmm isn't this basically a call to define with the last argument set to []?
 external :: LLVM.Type -> String -> [Argument] -> ModuleBuilder ()
-external returnType label arguments
-    = addDef $ LLVM.GlobalDefinition $ LLVM.functionDefaults 
-        { LLVM.Global.name        = LLVM.Name label
-        , LLVM.Global.parameters  = (params, False)
-        , LLVM.Global.returnType  = returnType
-        , LLVM.Global.basicBlocks = []
-        } where
-            params = map makeParam arguments
+external returnType label arguments = define returnType label arguments []
 
 -- Modules:
 

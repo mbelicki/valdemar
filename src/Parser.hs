@@ -121,8 +121,8 @@ character = do
 
 stringValue :: Parser (Expression ())
 stringValue = do
-    value <- stringLiteral
-    let values = map (`CharacterExpr` ()) value
+    value <- stringLiteral 
+    let values = map (`CharacterExpr` ()) (value ++ "\0")
     return $ ArrayExpr values ()
 
 array :: Parser (Expression ())

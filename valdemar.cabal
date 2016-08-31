@@ -3,7 +3,6 @@ version:             0.1.0.0
 synopsis:            A simple compier of very simple language called Valdemar 
 description:         Please see README.md
 homepage:            http://github.com/mbelicki/valdemar#readme
-source-repository:   http://github.com/mbelicki/valdemar
 license:             GPLv3
 license-file:        LICENSE.md
 author:              Mateusz Belicki 

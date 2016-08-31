@@ -81,8 +81,10 @@ generateSingleDef (S.NamedTupleDeclExpr name fileds _)
     
 
 generateCommonDecls :: CG.ModuleBuilder ()
-generateCommonDecls =
-    CG.external (getLLVMType S.TypeUnit) "bounds_check_failed" []
+generateCommonDecls = do
+    bounds_defined <- CG.isGlobalDefined "bounds_check_failed"
+    M.unless bounds_defined $ 
+        CG.external (getLLVMType S.TypeUnit) "bounds_check_failed" []
 
 emitStatement :: S.Statement S.Type -> CG.CodeGenerator ()
 emitStatement (S.ExpressionStmt n) = M.void $ emitExprForValue n
@@ -435,6 +437,7 @@ generate format name outPath defs =
                 return newAst
             where
                 mod = CG.emptyModule name
-                modn = generateCommonDecls >> mapM generateSingleDef defs
-                newAst = CG.buildModule mod modn
-
+                newAst = CG.buildModule mod $ do
+                    ds <- mapM generateSingleDef defs
+                    generateCommonDecls
+                    return ds
