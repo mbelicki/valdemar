@@ -199,19 +199,42 @@ buildSource filePath options = do
 
         compileMessage = "Compiling: '" ++ filePath ++ "' -> '" ++ outPath ++ "'"
 
-linkAll :: String -> [String] -> IO ()
-linkAll outName objectPaths
-    = Proc.callProcess "ld" args
-        where 
-            args = objectPaths ++ ldArgs ++ output
-	    ldArgs = if Info.os == "linux" then gnuArgs else osxArgs
+checkFiles :: [String] -> IO (Bool, [F.Fault])
+checkFiles paths = do
+    results <- M.forM paths $ \path -> do
+        exists <- Dir.doesFileExist path 
+        return $ if exists then Nothing else Just path
+    
+    let notExisting = Maybe.catMaybes results
+        makeFault path = F.Fault F.Error "Cannot access file." $ "Path: " ++ path
+        faults = map makeFault notExisting
+    
+    return (null notExisting, faults)
+
+linkAll :: String -> [String] -> IO (Bool, [F.Fault])
+linkAll outName objectPaths = do
+    let requiredFiles = case Info.os of
+                    "linux" -> ["/lib/ld-linux.so.2", "/usr/lib/i386-linux-gnu/crti.o"
+                               , "/usr/lib/i386-linux-gnu/crt1.o", "/usr/lib/i386-linux-gnu/crtn.o"
+                               ]
+                    "darwin" -> ["/usr/lib/crt1.o"]
+                    _ -> []
+
+    (ok, faults) <- checkFiles requiredFiles
+    M.when ok $ do
+        let args = objectPaths ++ ldArgs ++ output
+            ldArgs = if Info.os == "linux" then gnuArgs else osxArgs
             osxArgs = [ "/usr/lib/crt1.o", "-arch", "x86_64"
                       , "-macosx_version_min", "10.11", "-lSystem"
                       ]
-	    gnuArgs = [ "-dynamic-linker", "/lib/ld-linux.so.2"
+            gnuArgs = [ "-dynamic-linker", "/lib/ld-linux.so.2"
                       , "/usr/lib/i386-linux-gnu/crti.o", "/usr/lib/i386-linux-gnu/crt1.o"
-                      , "-lc", "-lm", "/usr/lib/i386-linux-gnu/crtn.o" ]
+                      , "-lc", "-lm", "/usr/lib/i386-linux-gnu/crtn.o"
+                      ]
             output = ["-o", outName]
+        Proc.callProcess "ld" args
+
+    return (ok, faults)
 
 compile :: CompilerOptions -> [String] -> IO ()
 compile options files = do
@@ -227,7 +250,8 @@ compile options files = do
     M.when (outputType == OutExecutable && not somethingFailed) $ do
         let allObjects = objects ++ map (++ ".o") sources
         let outName = compilerOutputName options
-        linkAll outName allObjects
+        (_, faults) <- linkAll outName allObjects
+        printFaults faults
 
     M.when (outputType == OutExecutable && somethingFailed) $ do
         putStrLn "Compilation failed."
