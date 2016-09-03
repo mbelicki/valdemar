@@ -2,7 +2,7 @@ valdemar
 ========
 
 valdemar is a small experimental programming language, here is a short code
-snippet: 
+snippet:
 
 ```lua
 -- comments start with dobule dash
@@ -30,7 +30,7 @@ fn length (p point_t) -> double_t {
     return sqrt(x * x + y * y)
 }
 
--- main denotes program entry point
+-- main function is entry point of the program
 fn main () -> unit_t {
     -- the array below is allocated on stack and is immutable,
     -- type of 'numbers' is: pointer to array of double_t
@@ -50,13 +50,23 @@ building
 --------
 
 Current version of compiler is developed in Haskell, project can be compiled on
-GNU/Linux (tested on Ubuntu 14.04 LTS) and Mac OS X (tested on 10.11).
+GNU/Linux (tested on Ubuntu 16.04 LTS, 64-bit) and macOS (tested on 10.11).
+
+Building valdemar on Ubuntu requires following packages installed:
+
+```shell
+apt-get install gcc llvm llvm-3.5 libz-dev libedit-dev
+```
+
+On macOS you will need command line tools provided by Apple (compiler, linker etc.) and similar set of libraries as on Ubunut (zlib, llvm-3.5, libedit) you can get them from brew or other package manager.
 
 To compile use cabal:
 
-    $ cabal sandbox init
-    $ cabal install --only-dependencies 
-    $ cabal build
+```shell
+cabal sandbox init
+cabal install --only-dependencies 
+cabal build
+```
 
 license
 -------
