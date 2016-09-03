@@ -1,4 +1,4 @@
-ext_c printf (str ^byte_t) -> unit_t
+ext_c puts (str ^byte_t) -> unit_t
 ext_c abort () -> unit_t
 
 fn bounds_check_failed (s str_t) -> unit_t {
@@ -7,5 +7,5 @@ fn bounds_check_failed (s str_t) -> unit_t {
 }
 
 fn print (s str_t) -> unit_t {
-    printf(@s[0])
+    puts(@s[0])
 }

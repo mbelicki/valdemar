@@ -212,8 +212,8 @@ linkAll :: String -> [String] -> CompilerOptions -> IO (Bool, [F.Fault])
 linkAll outName objectPaths options = do
     M.when (compilerVerbose options) $ putStrLn ("Linking: " ++ outName)
     let requiredFiles = case Info.os of
-                    "linux" -> ["/lib/ld-linux.so.2", "/usr/lib/i386-linux-gnu/crti.o"
-                               , "/usr/lib/i386-linux-gnu/crt1.o", "/usr/lib/i386-linux-gnu/crtn.o"
+                    "linux" -> [ "/lib64/ld-linux-x86-64.so.2", "/usr/lib/x86_64-linux-gnu/crti.o"
+                               , "/usr/lib/x86_64-linux-gnu/crt1.o", "/usr/lib/x86_64-linux-gnu/crtn.o"
                                ]
                     "darwin" -> ["/usr/lib/crt1.o"]
                     _ -> []
@@ -225,9 +225,9 @@ linkAll outName objectPaths options = do
             osxArgs = [ "/usr/lib/crt1.o", "-arch", "x86_64"
                       , "-macosx_version_min", "10.11", "-lSystem"
                       ]
-            gnuArgs = [ "-dynamic-linker", "/lib/ld-linux.so.2"
-                      , "/usr/lib/i386-linux-gnu/crti.o", "/usr/lib/i386-linux-gnu/crt1.o"
-                      , "-lc", "-lm", "/usr/lib/i386-linux-gnu/crtn.o"
+            gnuArgs = [ "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2"
+                      , "/usr/lib/x86_64-linux-gnu/crti.o", "/usr/lib/x86_64-linux-gnu/crt1.o"
+                      , "-lc", "-lm", "/usr/lib/x86_64-linux-gnu/crtn.o"
                       ]
             output = ["-o", outName]
         --Proc.callProcess "ld" args
