@@ -1,0 +1,125 @@
+ext_c printf (s ^byte_t) -> unit_t
+ext_c print_int (i int_t) -> unit_t
+
+-- a handy wrapper for printf:
+fn put (s str_t) -> unit_t printf(@s[0])
+
+tuple board_t {
+    width, height int_t,
+    data ^[int_t],
+}
+
+fn get (b ^board_t, i, j int_t) -> int_t {
+    if i < 0 | i >= b->width return 0
+    if j < 0 | j >= b->height return 0
+
+    val data ^[int_t] = b->data -- TODO: language error, cannot subscript expression
+    return data[i + j * b->width]
+}
+
+fn set (b ^board_t, i, j int_t, v int_t) -> unit_t {
+    -- TODO: language error, return without value impossible
+    -- if i < 0 | i >= b->width return
+    -- if j < 0 | j >= b->height return
+
+    val data ^[int_t] = b->data -- TODO: language error, cannot subscript expression
+    data[i + j * b->width] = v
+}
+
+fn print_board (b ^board_t) -> unit_t {
+    val (!line int_t, !col int_t) = (0, 0)
+    while line < b->height {
+        col = 0
+        while col < b->width {
+            val v int_t = get(b, col, line)
+            if v == 0 put(".")
+            if v == 1 put("#")
+            if v > 1  put("!")
+            col = col + 1
+        }
+        put("\n")
+        line = line + 1
+    }
+    put("\n")
+}
+
+fn count_ative_neighbors (b ^board_t, oi, oj int_t) -> int_t {
+    -- TODO: it is acutally possible to override arguments
+    val !result int_t = 0
+    val !j int_t = 0
+    -- TODO: `while -1 < 2` never runs
+    while j < 3 {
+        val !i int_t = 0
+        while i < 3 {
+            -- TODO: `i /= 1 & j /= 1` is not working as expected
+            if (i * j) /= 1 {
+                val x int_t = oi + i - 1
+                val y int_t = oj + j - 1
+                result = result + get(b, x, y)
+                --print_int(x) put(" ") print_int(y) put("\n")
+            }
+            i = i + 1
+        }
+        --put("---\n")
+        j = j + 1
+    }
+    return result
+}
+
+fn update (b ^board_t, out ^board_t) -> unit_t {
+    val (!i int_t, !j int_t) = (0, 0)
+    while j < b->height {
+        i = 0
+        while i < b->width {
+            val v int_t = get(b, i, j)
+            val n int_t = count_ative_neighbors(b, i, j)
+            --set(out, i, j, n)
+            
+            if v == 1 {
+                if n < 2 set(out, i, j, 0)
+                if n > 3 set(out, i, j, 0)
+                if n == 2 set(out, i, j, 1)
+            }
+            if v == 0 { 
+                if n == 3 set(out, i, j, 1)
+            }
+
+            i = i + 1
+        }
+        j = j + 1
+    }
+}
+
+fn main () -> unit_t {
+    val board1 board_t = (7, 7, [
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 1, 0, 0, 0,
+        0, 0, 1, 0, 1, 0, 0,
+        0, 0, 0, 1, 1, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+    ])
+    val board2 board_t = (7, 7, [
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0,
+    ])
+    
+    val (in, out ^board_t) = (@board1, @board2)
+    val !i int_t = 8
+    while i > 0 {
+        print_board(in)
+        update(in, out)
+
+        val tmp ^board_t = out
+        out = in
+        in = tmp
+
+        i = i - 1
+    }
+}
