@@ -17,7 +17,7 @@ import qualified Data.List as List
 
 -- udnderlying data types and state setup
 
-type Decl = (S.Name, S.Type)
+type Decl = (S.Name, (S.Type, S.BindingKind))
 type TypeAlias = (S.Name, S.Type)
 
 data Scope 
@@ -81,7 +81,7 @@ findInScope getter scope name
 
 beginFunction :: S.FunctionDeclaration -> TypeChecker ()
 beginFunction rawDecl = do 
-    let decl = (S.nameOfFunDecl rawDecl, S.funDeclToType rawDecl)
+    let decl = (S.nameOfFunDecl rawDecl, (S.funDeclToType rawDecl, S.Immutable))
     modify $ \s -> s { checkerCurrentFunction = Just decl }
     pushScope
 
@@ -104,7 +104,8 @@ createFault :: F.FaultLevel -> String -> String -> TypeChecker ()
 createFault level message contextStart = do
     maybeStmt <- getLastStatement
     let stmtPart = maybe "" (\s -> "In statement: '" ++ show s ++ "'") maybeStmt
-        context = contextStart ++ "\n" ++ stmtPart
+        context = contextPrefix ++ stmtPart
+        contextPrefix = if contextStart == "" then "" else contextStart ++ "\n"
     addFault $ F.Fault level message context
 
 
@@ -160,7 +161,7 @@ fetchDeclType name e = do
         let msg = "Unknown variable: '" ++ name ++ "'."
             ctx = "In expression: '" ++ show e ++ "'"
         createFault F.Error msg ctx
-    return $ maybe S.TypeBottom snd maybeDecl
+    return $ maybe S.TypeBottom (fst . snd) maybeDecl
 
 isTuple :: S.Type -> Bool
 isTuple (S.TypeTuple _ _) = True
@@ -187,7 +188,7 @@ findGlobals :: [S.Expression a] -> Scope
 findGlobals s = buildScope decls aliases
     where
         getDecl :: S.FunctionDeclaration -> Decl
-        getDecl decl@(S.FunDecl name _ _) = (name, S.funDeclToType decl)
+        getDecl decl@(S.FunDecl name _ _) = (name, (S.funDeclToType decl, S.Immutable))
 
         funcToDecl :: S.Expression a -> Maybe Decl
         funcToDecl (S.FunDeclExpr d _ _) = Just $ getDecl d
@@ -313,6 +314,24 @@ findCommonImplicitTypes ts = List.nub $ filter (canCastTo ts) ts
     canCastTo :: [S.Type] -> S.Type -> Bool
     canCastTo ts t = all (castableTo t) ts
 
+checkLeftHandAssignmentSide :: S.Expression a -> TypeChecker ()
+checkLeftHandAssignmentSide e = do
+    (possible, reason) <- canAssignTo e
+    M.unless possible $ do
+        let msg = "'" ++ show e ++ "' cannot be used as left hand side of the assigment."
+        createFault F.Error msg reason
+  where
+    canAssignTo :: S.Expression a -> TypeChecker (Bool, String)
+    canAssignTo (S.ElementOfExpr arr idx _) = return (True, "") -- check if array is mutable
+    canAssignTo (S.VarExpr name _) = do
+        maybeDecl <- findDecl name
+        case maybeDecl of
+            Just (_, (_, S.Immutable)) -> return (False, "Variable '" ++ name ++ "' is immutable.")
+            Just (_, _) -> return (True, "")
+            Nothing -> return (False, "Variable '" ++ name ++ "' is not defined.")
+    canAssignTo (S.PrefixOpExpr op _ _) = return (True, "") -- check if reference or dereference
+    canAssignTo _ = return (False, "")
+    
 
 transformExpression :: S.Expression () -> TypeChecker (S.Expression S.Type)
 -- trivially typable expresions:
@@ -516,7 +535,7 @@ transformExpression e@(S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
 
     valueTy <- resolveType t
     typedValue <- transformExpression rawValue >>= castExprImplicitly valueTy
-    addLocalDecl (name, valueTy)
+    addLocalDecl (name, (valueTy, kind))
     return $ S.ValDeclExpr (S.ValBind kind name valueTy) typedValue valueTy
 
 transformExpression e@(S.ValDestructuringExpr bindings rawValue _) = do
@@ -525,14 +544,14 @@ transformExpression e@(S.ValDestructuringExpr bindings rawValue _) = do
 
     typedValue <- transformExpression rawValue >>= castExprImplicitly packedType
 
-    M.forM_ resolvedBindings $ \(S.ValBind _ name ty) -> do
+    M.forM_ resolvedBindings $ \(S.ValBind kind name ty) -> do
         alreadyExists <- Maybe.isJust <$> findDecl name
         M.when alreadyExists $ do
             let msg = "Variable '" ++ name 
                       ++ "' has already been defined in current scope."
                 ctx = "Second declaration: '" ++ show e ++ "'"
             createFault F.Error msg ctx
-        addLocalDecl (name, ty)
+        addLocalDecl (name, (ty, kind))
 
     return $ S.ValDestructuringExpr resolvedBindings typedValue packedType
 
@@ -552,7 +571,7 @@ transformExpression (S.FunDeclExpr funDecl stmt _) = do
   where
     declareArguments :: S.FunctionDeclaration -> TypeChecker ()
     declareArguments (S.FunDecl _ args _)
-        = M.forM_ args $ \(S.ValBind _ name ty) -> addLocalDecl (name, ty)
+        = M.forM_ args $ \(S.ValBind kind name ty) -> addLocalDecl (name, (ty, kind))
 
     resolveFunDecl :: S.FunctionDeclaration -> TypeChecker S.FunctionDeclaration
     resolveFunDecl (S.FunDecl name args retTy) = do
@@ -579,7 +598,7 @@ transformStatement s@(S.ReturnStmt rawExpr) = do
         createFault F.Error msg ""
     
     let funName = maybe "" fst maybeFunDecl
-        funType = maybe S.TypeBottom snd maybeFunDecl
+        funType = maybe S.TypeBottom (fst . snd) maybeFunDecl
 
     retType <- resolveType $ getRetType funType
     M.when (retType == S.TypeUnit) $ do
@@ -622,6 +641,13 @@ transformStatement s@(S.WhileStmt rawCondition rawBody) = do
 transformStatement s@(S.AssignmentStmt rawLhs rawRhs) = do
     setCurrentStatement s
     -- TODO: check if lhs is valid lhs expression
+    --M.unless (canAssignTo rawLhs) $ do
+    --    let msg = "Cannot assign to '" ++ show rawLhs ++ "'."
+    --        ctx = "Expression '" ++ show rawLhs ++ "' "
+    --    createFault F.Error msg ctx
+
+    checkLeftHandAssignmentSide rawLhs
+        
     lhs <- transformExpression rawLhs
     rhs <- transformExpression rawRhs >>= castExprImplicitly (S.tagOfExpr lhs)
     return $ S.AssignmentStmt lhs rhs

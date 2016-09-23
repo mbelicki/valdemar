@@ -56,10 +56,8 @@ fn count_ative_neighbors (b ^board_t, oi, oj int_t) -> int_t {
 }
 
 fn update (b ^board_t, out ^board_t) -> unit_t {
-    val (!i int_t, !j int_t) = (0, 0)
-    while j < b->height {
-        i = 0
-        while i < b->width {
+    val !j int_t = 0 while j < b->height {
+        val !i int_t = 0 while i < b->width {
             val v int_t = get(b, i, j)
             val n int_t = count_ative_neighbors(b, i, j)
             
@@ -99,9 +97,8 @@ fn main () -> int_t {
         0, 0, 0, 0, 0, 0, 0,
     ])
     
-    val (in, out ^board_t) = (@board1, @board2)
-    -- TODO:can mutate immutable variable
-    val i int_t = 16 while i > 0 {
+    val (!in, !out ^board_t) = (@board1, @board2)
+    val !i int_t = 16 while i > 0 {
         print_board(in)
         update(in, out)
 
