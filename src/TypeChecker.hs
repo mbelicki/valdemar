@@ -488,16 +488,17 @@ transformExpression e@(S.CallExpr name args _) = do
                           ++ "Actual type:    '" ++ show act ++ "'\n"
                           ++ exprCtx
 
-transformExpression e@(S.ElementOfExpr name index _) = do
+transformExpression e@(S.ElementOfExpr arr index _) = do
     castedIndex <- castExprImplicitly (S.TypeInteger 64) =<< transformExpression index
-    arrayType <- fetchDeclType name e
+    typedArr <- transformExpression arr
+    let arrayType = S.tagOfExpr typedArr
     M.unless (S.isArrayPointer arrayType) $ do 
-        let msg = "Variable '" ++ name ++ "' is not an array pointer."
+        let msg = "Variable '" ++ show arr ++ "' is not an array pointer."
             ctx = "In expression: '" ++ show e ++ "'"
         createFault F.Error msg ctx
     
     resType <- resolveType $ innerType arrayType
-    return $ S.ElementOfExpr name castedIndex resType
+    return $ S.ElementOfExpr typedArr castedIndex resType
   where
     innerType :: S.Type -> S.Type
     innerType (S.TypePointer (S.TypeArray t)) = t

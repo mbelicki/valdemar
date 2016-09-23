@@ -13,8 +13,7 @@ fn get (b ^board_t, i, j int_t) -> int_t {
     if i < 0 | i >= b->width return 0
     if j < 0 | j >= b->height return 0
 
-    val data ^[int_t] = b->data -- TODO: language error, cannot subscript expression
-    return data[i + j * b->width]
+    return b->data[i + j * b->width]
 }
 
 fn set (b ^board_t, i, j int_t, v int_t) -> unit_t {
@@ -22,8 +21,7 @@ fn set (b ^board_t, i, j int_t, v int_t) -> unit_t {
     -- if i < 0 | i >= b->width return
     -- if j < 0 | j >= b->height return
 
-    val data ^[int_t] = b->data -- TODO: language error, cannot subscript expression
-    data[i + j * b->width] = v
+    b->data[i + j * b->width] = v
 }
 
 fn print_board (b ^board_t) -> unit_t {

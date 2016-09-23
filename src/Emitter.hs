@@ -208,9 +208,9 @@ emitExprForAddress (S.AnonTupleExpr ns ty) = do
         CG.store memberPtr op
     return ptr
 
-emitExprForAddress (S.ElementOfExpr name index ty) = do
+emitExprForAddress (S.ElementOfExpr arr index ty) = do
     indexOp <- emitExprForValue index
-    arrayOp <- CG.getLocal name >>= CG.load
+    arrayOp <- emitExprForValue arr
 
     let offset      = CG.const $ LLVM.Const.Int 32 0
         dataOffset  = CG.const $ LLVM.Const.Int 32 1

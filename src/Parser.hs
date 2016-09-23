@@ -227,9 +227,15 @@ call = do
 
 elementOf :: Parser (Expression ())
 elementOf = do
-    array <- identifier
+    array <- indexableExpr -- TODO: this should be any expression
     index <- brackets expr
     return $ ElementOfExpr array index ()
+  where
+    indexableExpr :: Parser (Expression ())
+    indexableExpr
+        = E.buildExpressionParser table
+            $ try stringValue <|> try array <|> variable
+
 
 anyExpr :: Parser (Expression ())
 anyExpr = try floating

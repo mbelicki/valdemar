@@ -138,7 +138,7 @@ data Expression tag
     | AnonTupleExpr [Expression tag] tag
     | PrefixOpExpr Operation (Expression tag) tag
     | BinOpExpr Operation (Expression tag) (Expression tag) tag
-    | ElementOfExpr Name (Expression tag) tag
+    | ElementOfExpr (Expression tag) (Expression tag) tag
     | VarExpr Name tag
     | ValDeclExpr ValueBinding (Expression tag) tag
     | ValDestructuringExpr [ValueBinding] (Expression tag) tag
@@ -176,7 +176,7 @@ instance Show (Expression a) where
     show (AnonTupleExpr es _) = "(" ++ showCommaSep es ++ ")" 
     show (PrefixOpExpr op e _) =  show op ++ show e
     show (BinOpExpr op e1 e2 _) = show e1 ++ " " ++  show op ++ " " ++ show e2
-    show (ElementOfExpr n e _) = n ++ "[" ++ show e ++ "]"
+    show (ElementOfExpr arr e _) = show arr ++ "[" ++ show e ++ "]"
     show (VarExpr n _) = n
     show (ValDeclExpr b e _) = "val " ++ show b ++ " = " ++ show e
     show (ValDestructuringExpr bs e _) = "val (" ++ showCommaSep bs ++ ") = " ++ show e
