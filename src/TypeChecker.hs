@@ -250,7 +250,7 @@ simplifyType t = t
 
 
 needsCast :: S.Type -> S.Type -> Bool
-needsCast t1@(S.TypeTuple n1 _) t2@(S.TypeTuple n2 _) = n1 /= n2
+needsCast (S.TypeTuple n1 _) (S.TypeTuple n2 _) = n1 /= n2 || n1 == ""
 needsCast _ S.TypeBottom = False
 needsCast actual expected = expected /= actual
 
@@ -261,11 +261,13 @@ hasTheSameLayout (S.TypeFloating n1) (S.TypeFloating n2) = n1 == n2
 hasTheSameLayout (S.TypeArray t1) (S.TypeArray t2) = hasTheSameLayout t1 t2
 hasTheSameLayout (S.TypePointer t1) (S.TypePointer t2) = True
 hasTheSameLayout (S.TypeTuple _ fields1) (S.TypeTuple _ fields2)
-    = and $ zipWith hasTheSameLayout fs1 fs2
+    = sameLength && mathingTypes
   where
+    sameLength = length fields1 == length fields2
+    mathingTypes = and $ zipWith hasTheSameLayout fs1 fs2
     stripFiledNames = map (\(S.Field _ t) -> t)
     fs1 = stripFiledNames fields1
-    fs2 = stripFiledNames fields1
+    fs2 = stripFiledNames fields2
 
 hasTheSameLayout _ _ = False
 
