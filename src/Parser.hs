@@ -275,14 +275,14 @@ ifStmt :: Parser (Statement ())
 ifStmt = do
     reserved "if" 
     cond <- expr
-    body <- statement
+    body <- blockStmt
     return $ IfStmt cond body
 
 whileStmt :: Parser (Statement ())
 whileStmt = do
     reserved "while"
     cond <- expr
-    body <- statement
+    body <- blockStmt
     return $ WhileStmt cond body
 
 assignmentStmt :: Parser (Statement ())
