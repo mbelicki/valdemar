@@ -517,13 +517,20 @@ transformExpression e@(S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
     addLocalDecl (name, valueTy)
     return $ S.ValDeclExpr (S.ValBind kind name valueTy) typedValue valueTy
 
-transformExpression (S.ValDestructuringExpr bindings rawValue _) = do
+transformExpression e@(S.ValDestructuringExpr bindings rawValue _) = do
     resolvedBindings <- M.mapM resolveBinding bindings
     let packedType = S.TypeTuple "" (map (\(S.ValBind _ n t) -> S.Field n t) resolvedBindings)
 
     typedValue <- transformExpression rawValue >>= castExprImplicitly packedType
 
-    M.forM_ resolvedBindings $ \(S.ValBind _ name ty) -> addLocalDecl (name, ty)
+    M.forM_ resolvedBindings $ \(S.ValBind _ name ty) -> do
+        alreadyExists <- Maybe.isJust <$> findDecl name
+        M.when alreadyExists $ do
+            let msg = "Variable '" ++ name 
+                      ++ "' has already been defined in current scope."
+                ctx = "Second declaration: '" ++ show e ++ "'"
+            createFault F.Error msg ctx
+        addLocalDecl (name, ty)
 
     return $ S.ValDestructuringExpr resolvedBindings typedValue packedType
 

@@ -42,7 +42,6 @@ fn print_board (b ^board_t) -> unit_t {
 }
 
 fn count_ative_neighbors (b ^board_t, oi, oj int_t) -> int_t {
-    -- TODO: it is acutally possible to override arguments
     val !result int_t = 0
     val !j int_t = 0
     -- TODO: `while -1 < 2` never runs
