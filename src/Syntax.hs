@@ -214,7 +214,7 @@ data Statement a
     | ExpressionStmt (Expression a)
     | BlockStmt [Statement a]
     | IfStmt (Expression a) (Statement a)
-    | WhileStmt (Expression a) (Statement a)
+    | WhileStmt (Expression a) (Maybe (Statement a)) (Statement a)
     | AssignmentStmt (Expression a) (Expression a)
     deriving (Eq, Ord)
 
@@ -223,6 +223,6 @@ instance Show (Statement a) where
     show (ExpressionStmt e) = show e
     show (BlockStmt stmts) = "{" ++ List.intercalate "\n" (map show stmts) ++ "}"
     show (IfStmt cond body) = "if " ++ show cond ++ show body
-    show (WhileStmt cond body) = "while " ++ show cond ++ show body
+    show (WhileStmt cond update body) = "while " ++ show cond ++ show update ++ show body
     show (AssignmentStmt lhs rhs) = show lhs ++ " = " ++ show rhs
 

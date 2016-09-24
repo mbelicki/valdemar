@@ -288,8 +288,11 @@ whileStmt :: Parser (Statement ())
 whileStmt = do
     reserved "while"
     cond <- expr
+    update <- updateStmt <|> return Nothing
     body <- blockStmt
-    return $ WhileStmt cond body
+    return $ WhileStmt cond update body
+  where
+    updateStmt = (Just <$> (operator ";" >> try assignmentStmt))
 
 assignmentStmt :: Parser (Statement ())
 assignmentStmt = do

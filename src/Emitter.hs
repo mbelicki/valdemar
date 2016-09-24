@@ -106,7 +106,7 @@ emitStatement (S.IfStmt cond body) = do
     CG.setBlock endBlock
     return ()
 
-emitStatement (S.WhileStmt cond body) = do
+emitStatement (S.WhileStmt cond update body) = do
     beginBlock <- CG.addBlock "while.begin"
     bodyBlock <- CG.addBlock "while.body"
     endBlock  <- CG.addBlock "while.end"
@@ -119,6 +119,9 @@ emitStatement (S.WhileStmt cond body) = do
 
     CG.setBlock bodyBlock
     emitStatement body
+    -- emit update statement if present:
+    maybe (return ()) emitStatement update
+    
     block <- CG.currentBlock
     M.when (CG.needsTerminator block) $ 
         M.void $ CG.br beginBlock

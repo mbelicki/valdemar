@@ -637,23 +637,17 @@ transformStatement s@(S.IfStmt rawCondition rawBody) = do
     typedBody <- transformStatement rawBody
     return $ S.IfStmt cond typedBody
 
-transformStatement s@(S.WhileStmt rawCondition rawBody) = do
+transformStatement s@(S.WhileStmt rawCondition rawUpdate rawBody) = do
     setCurrentStatement s
     typedBody <- transformStatement rawBody
     cond <- brachCond rawCondition
-    return $ S.WhileStmt cond typedBody
+    update <- maybe (return Nothing) ((M.liftM Just) <$> transformStatement) rawUpdate
+    return $ S.WhileStmt cond update typedBody
 
 transformStatement s@(S.AssignmentStmt rawLhs rawRhs) = do
     setCurrentStatement s
-    -- TODO: check if lhs is valid lhs expression
-    --M.unless (canAssignTo rawLhs) $ do
-    --    let msg = "Cannot assign to '" ++ show rawLhs ++ "'."
-    --        ctx = "Expression '" ++ show rawLhs ++ "' "
-    --    createFault F.Error msg ctx
-
     checkLeftHandAssignmentSide rawLhs
         
     lhs <- transformExpression rawLhs
     rhs <- transformExpression rawRhs >>= castExprImplicitly (S.tagOfExpr lhs)
     return $ S.AssignmentStmt lhs rhs
-    
