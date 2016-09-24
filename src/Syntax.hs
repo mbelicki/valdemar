@@ -5,7 +5,7 @@ module Syntax ( Name
               , TupleFiled(Field)
               , Type(..)
               , isArray, isPointer, isArrayPointer, isFunction
-              , ValueBinding(..), FunctionDeclaration(..)
+              , ValueBinding(..), bindingType, FunctionDeclaration(..)
               , funDeclToType, nameOfFunDecl
               , Expression(..), tagOfExpr
               , Statement(..)
@@ -63,6 +63,7 @@ data Type = TypeFloating BitCount
           | TypeTuple Name [TupleFiled]
           | TypeUnknow Name
           | TypeBottom -- used by type checker for typing errors
+          | TypeAuto -- used for type inference
           deriving (Eq, Ord)
 
 printFloatingType n
@@ -93,6 +94,7 @@ instance Show Type where
       where
         fieldsStr = showCommaSep $ map (\(Field _ t) -> t) fields
     show TypeBottom = "_bottom_"
+    show TypeAuto = "_auto_"
 
 isArray :: Type -> Bool
 isArray TypeArray{} = True
@@ -111,6 +113,9 @@ isFunction TypeFunction{} = True
 isFunction _ = False
 
 data ValueBinding = ValBind BindingKind Name Type deriving (Eq, Ord)
+
+bindingType :: ValueBinding -> Type
+bindingType (ValBind _ _ t) = t
 
 showBindingKind :: BindingKind -> String
 showBindingKind Immutable = ""

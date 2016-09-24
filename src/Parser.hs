@@ -88,6 +88,7 @@ typeDecl = typeArray
        <|> typeUnit
        <|> typeAnonTuple
        <|> typeUnknow
+       <?> "type declaration"
 
 int :: Parser (Expression ())
 int = do
@@ -148,26 +149,31 @@ valueDecl :: Parser ValueBinding
 valueDecl = do
     kind <- valueDeclKind
     name <- identifier
-    typeName <- typeDecl
+    typeName <- typeDecl <|> return TypeAuto
     return $ ValBind kind name typeName
 
-bindingPack :: Parser [ValueBinding]
-bindingPack = do
-    names <- commaSepNoDangling kindNamePair
-    typeName <- typeDecl
-    return $ map (\(kind, name) -> ValBind kind name typeName) names
-  where
-    kindNamePair :: Parser (BindingKind, Name)
-    kindNamePair = do
-        kind <- valueDeclKind
-        name <- identifier
-        return (kind, name)
+autoValueDecl :: Parser ValueBinding
+autoValueDecl = do
+    kind <- valueDeclKind
+    name <- identifier
+    return $ ValBind kind name TypeAuto
 
 argList :: Parser [ValueBinding]
 argList = do
-    let singleArg = M.liftM (: []) valueDecl
-    args <- commaSep (try singleArg <|> bindingPack)
-    return $ concat args
+    args <- commaSep valueDecl
+    return $ propagateType args
+  where
+    -- replace _auto_ with type of next variable if there is a next variable
+    propagateType [] = []
+    propagateType args@(a:as)
+        = reverse $ propagateTypeRec (reverse args) (bindingType a)
+    
+    propagateTypeRec [] _ = []
+    propagateTypeRec (a:as) t
+        = [setTypeIfAuto a t] ++ propagateTypeRec as (bindingType a)
+
+    setTypeIfAuto :: ValueBinding -> Type -> ValueBinding
+    setTypeIfAuto b@(ValBind k n t) ty = if t == TypeAuto then ValBind k n ty else b
 
 value :: Parser (Expression ())
 value = do

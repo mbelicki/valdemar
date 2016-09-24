@@ -533,8 +533,13 @@ transformExpression e@(S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
             ctx = "Second declaration: '" ++ show e ++ "'"
         createFault F.Error msg ctx
 
-    valueTy <- resolveType t
-    typedValue <- transformExpression rawValue >>= castExprImplicitly valueTy
+    rawValueType <- resolveType t
+    rawTypedValue <- transformExpression rawValue 
+    let valueTy = if rawValueType == S.TypeAuto 
+                  then S.tagOfExpr rawTypedValue 
+                  else rawValueType
+    typedValue <- castExprImplicitly valueTy rawTypedValue
+    
     addLocalDecl (name, (valueTy, kind))
     return $ S.ValDeclExpr (S.ValBind kind name valueTy) typedValue valueTy
 
