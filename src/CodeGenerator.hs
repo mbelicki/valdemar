@@ -293,16 +293,16 @@ ineq :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
 ineq = intComparison LLVM.IntPred.NE
 
 ilt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
-ilt = intComparison LLVM.IntPred.ULT
+ilt = intComparison LLVM.IntPred.SLT
 
 igt :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
-igt = intComparison LLVM.IntPred.UGT
+igt = intComparison LLVM.IntPred.SGT
 
 ile :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
-ile = intComparison LLVM.IntPred.ULE
+ile = intComparison LLVM.IntPred.SLE
 
 ige :: LLVM.Operand -> LLVM.Operand -> CodeGenerator LLVM.Operand
-ige = intComparison LLVM.IntPred.UGE
+ige = intComparison LLVM.IntPred.SGE
 
 trunc :: LLVM.Type -> LLVM.Operand -> CodeGenerator LLVM.Operand
 trunc t a = instruction $ LLVM.Trunc a t []

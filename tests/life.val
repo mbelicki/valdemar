@@ -39,12 +39,10 @@ fn print_board (b ^board_t) -> unit_t {
 
 fn count_ative_neighbors (b ^board_t, oi, oj int_t) -> int_t {
     val !result = 0
-    -- TODO: `while -1 < 2` never runs
-    val !j = 0 while j < 3; j = j + 1 {
-        val !i = 0 while i < 3; i = i + 1 {
-            -- TODO: `i /= 1 & j /= 1` is not working as expected
-            if (i * j) /= 1 {
-                result = result + get(b, oi + i - 1, oj + j - 1)
+    val !j = -1 while j < 2; j = j + 1 {
+        val !i = -1 while i < 2; i = i + 1 {
+            if i /= 0 | j /= 0 {
+                result = result + get(b, oi + i, oj + j)
             }
         }
     }
