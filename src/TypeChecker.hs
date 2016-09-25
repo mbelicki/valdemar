@@ -545,11 +545,13 @@ transformExpression e@(S.ValDeclExpr (S.ValBind kind name t) rawValue _) = do
 
 transformExpression e@(S.ValDestructuringExpr bindings rawValue _) = do
     resolvedBindings <- M.mapM resolveBinding bindings
-    let packedType = S.TypeTuple "" (map (\(S.ValBind _ n t) -> S.Field n t) resolvedBindings)
+    typedRawValue <- transformExpression rawValue
 
-    typedValue <- transformExpression rawValue >>= castExprImplicitly packedType
+    let typedBindings = infereTypes resolvedBindings $ fieldsTypes $ S.tagOfExpr typedRawValue
+        packedType = S.TypeTuple "" (map (\(S.ValBind _ n t) -> S.Field n t) typedBindings)
+    typedValue <- castExprImplicitly packedType typedRawValue
 
-    M.forM_ resolvedBindings $ \(S.ValBind kind name ty) -> do
+    M.forM_ typedBindings $ \(S.ValBind kind name ty) -> do
         alreadyExists <- Maybe.isJust <$> findDecl name
         M.when alreadyExists $ do
             let msg = "Variable '" ++ name 
@@ -558,7 +560,16 @@ transformExpression e@(S.ValDestructuringExpr bindings rawValue _) = do
             createFault F.Error msg ctx
         addLocalDecl (name, (ty, kind))
 
-    return $ S.ValDestructuringExpr resolvedBindings typedValue packedType
+    return $ S.ValDestructuringExpr typedBindings typedValue packedType
+  where
+    fieldsTypes :: S.Type -> [S.Type]
+    fieldsTypes (S.TypeTuple _ fields) = map (\(S.Field _ t) -> t) fields
+
+    infereTypes :: [S.ValueBinding] -> [S.Type] -> [S.ValueBinding]
+    infereTypes = zipWith infereType
+
+    infereType :: S.ValueBinding -> S.Type -> S.ValueBinding
+    infereType b@(S.ValBind k n t) ty = if t == S.TypeAuto then S.ValBind k n ty else b
 
 -- function declarations:
 transformExpression (S.FunDeclExpr funDecl stmt _) = do
