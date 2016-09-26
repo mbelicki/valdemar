@@ -6,10 +6,9 @@ fn interpret (prog str_t) -> unit_t {
     val !tape ^[byte_t] = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
     val !tape_index int_t = 0
 
-    val !i int_t = 0
     val !loop int_t = 0
 
-    while i < #prog {
+    val !i = 0 while i < #prog; i = i + 1 {
         val c byte_t = prog[i]
         if c == '>' {
             tape_index = tape_index + 1
@@ -45,8 +44,6 @@ fn interpret (prog str_t) -> unit_t {
                 }
             }
         }
-
-        i = i + 1
     }
 }
 

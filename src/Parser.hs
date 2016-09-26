@@ -170,7 +170,7 @@ argList = do
     
     propagateTypeRec [] _ = []
     propagateTypeRec (a:as) t
-        = [setTypeIfAuto a t] ++ propagateTypeRec as (bindingType a)
+        = [ta] ++ propagateTypeRec as (bindingType ta) where ta = setTypeIfAuto a t
 
     setTypeIfAuto :: ValueBinding -> Type -> ValueBinding
     setTypeIfAuto b@(ValBind k n t) ty = if t == TypeAuto then ValBind k n ty else b

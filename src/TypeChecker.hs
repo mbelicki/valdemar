@@ -217,17 +217,28 @@ resolveType t@(S.TypeUnknow name) = do
     globalScope <- getGlobals
     let maybeAlias = findAliasInScope globalScope name
     if Maybe.isNothing maybeAlias
-        then return t
+        then do
+            createFault F.Error ("Unknown type: '" ++ name ++ "'") ""
+            return t
         else do
             let Just (_, ty) = maybeAlias
-            resolveType ty -- TODO: infinite recursion on list node tuples
+            resolveType ty
+
+resolveType (S.TypeTuple n fs) = do
+    resolvedFields <- M.mapM resolveField fs 
+    return $ S.TypeTuple n resolvedFields
+  where
+    resolveField :: S.TupleFiled -> TypeChecker S.TupleFiled
+    resolveField (S.Field n ty) = do
+        rt <- resolveType ty
+        return $ S.Field n rt
 
 resolveType (S.TypeArray ty) = do
     resTy <- resolveType ty
     return $ S.TypeArray resTy
 
 resolveType (S.TypePointer ty) = do
-    resTy <- resolveType ty
+    resTy <- resolveType ty -- TODO: infinite recursion on list node tuples
     return $ S.TypePointer resTy
 
 resolveType (S.TypeFunction args ret) = do
@@ -255,6 +266,9 @@ needsCast (S.TypeTuple n1 _) (S.TypeTuple n2 _) = n1 /= n2 || n1 == ""
 needsCast _ S.TypeBottom = False
 needsCast actual expected = expected /= actual
 
+getFieldTypes :: [S.TupleFiled] -> [S.Type]
+getFieldTypes = map (\(S.Field _ t) -> t)
+
 hasTheSameLayout :: S.Type -> S.Type -> Bool
 hasTheSameLayout  S.TypeBoolean S.TypeBoolean = True
 hasTheSameLayout (S.TypeInteger n1) (S.TypeInteger n2) = n1 == n2
@@ -262,13 +276,12 @@ hasTheSameLayout (S.TypeFloating n1) (S.TypeFloating n2) = n1 == n2
 hasTheSameLayout (S.TypeArray t1) (S.TypeArray t2) = hasTheSameLayout t1 t2
 hasTheSameLayout (S.TypePointer t1) (S.TypePointer t2) = True
 hasTheSameLayout (S.TypeTuple _ fields1) (S.TypeTuple _ fields2)
-    = sameLength && mathingTypes
+    = if sameLength && mathingTypes then True else error $ (show fs1) ++ (show fs2)
   where
     sameLength = length fields1 == length fields2
     mathingTypes = and $ zipWith hasTheSameLayout fs1 fs2
-    stripFiledNames = map (\(S.Field _ t) -> t)
-    fs1 = stripFiledNames fields1
-    fs2 = stripFiledNames fields2
+    fs1 = getFieldTypes fields1
+    fs2 = getFieldTypes fields2
 
 hasTheSameLayout _ _ = False
 
@@ -278,11 +291,12 @@ canCastImplicitly  S.TypeBoolean      (S.TypeFloating _)  = True
 canCastImplicitly (S.TypeInteger _)   (S.TypeFloating _)  = True
 canCastImplicitly (S.TypeInteger n1)  (S.TypeInteger n2)  = n1 <= n2
 canCastImplicitly (S.TypeFloating n1) (S.TypeFloating n2) = n1 <= n2
-canCastImplicitly t1@(S.TypeTuple name1 _) t2@(S.TypeTuple name2 _) 
+canCastImplicitly t1@(S.TypeTuple name1 fs1) t2@(S.TypeTuple name2 fs2) 
     = nameCompatible && fieldsCompatible
   where
     nameCompatible = name1 == "" || name2 == "" || name1 == name2
     fieldsCompatible = hasTheSameLayout t1 t2
+
 -- allow usage of single filed tuples as values of the filed's type
 canCastImplicitly t1@S.TypeTuple{} t2 = canCastImplicitly (simplifyType t1) t2
 canCastImplicitly (S.TypePointer t1) (S.TypePointer t2) = hasTheSameLayout t1 t2
@@ -330,6 +344,8 @@ checkLeftHandAssignmentSide e = do
             Just (_, _) -> return (True, "")
             Nothing -> return (False, "Variable '" ++ name ++ "' is not defined.")
     canAssignTo (S.PrefixOpExpr op _ _) = return (True, "") -- check if reference or dereference
+    canAssignTo (S.BinOpExpr S.MemberOf _ _ _) = return (True, "") -- check if reference or dereference
+    canAssignTo (S.BinOpExpr S.DeRefMemberOf _ _ _) = return (True, "") -- check if reference or dereference
     canAssignTo _ = return (False, "")
     
 

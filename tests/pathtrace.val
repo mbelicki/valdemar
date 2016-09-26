@@ -44,11 +44,11 @@ fn vec3_cross (a, b vec3_t) -> vec3_t {
 }
 
 fn vec3_lerp (a, b vec3_t, k double_t) -> vec3_t {
-    if k <= 0 return a
-    if k >= 1 return b
+    if k <= 0 { return a }
+    if k >= 1 { return b }
 
     val nk double_t = 1 - k
-    val out vec3_t = (0, 0, 0)
+    val out vec3_t = (0.0, 0.0, 0.0) -- TODO: it should be possible for literals to use 0 instead of 0
     out.x = a.x * nk + b.x * k
     out.y = a.y * nk + b.y * k
     out.z = a.z * nk + b.z * k
@@ -72,21 +72,21 @@ fn ray_sphere_intersection (ray ^ray_t, sphere ^sphere_t) -> double_t {
     val b double_t = vec3_dot(op, ray->direction)
     val rad double_t = sphere->radius
     val det double_t = b * b - vec3_dot(op, op) + rad * rad
-    if det < 0.0 return 0.0
+    if det < 0.0 { return 0.0 }
 
     val det_root double_t = sqrt(det)
     val !t double_t = b - det_root
-    if t > eps return t
+    if t > eps { return t }
     
     t = b + det_root
-    if t > eps return t
+    if t > eps { return t }
 
     return 0.0
 }
 
-fn clamp (x double_t) -> double_t { 
-    if x < 0.0 return 0.0
-    if x > 1.0 return 1.0
+fn clamp (x double_t) -> double_t {
+    if x < 0.0 { return 0.0 }
+    if x > 1.0 { return 1.0 }
     return x
 }
 
@@ -96,16 +96,14 @@ fn intersects_any
 
     val !t  double_t = inf
     val !id int_t = 0
-    val !i  int_t = 0
 
-    while i < #spheres { -- TODO: of course for loop would be handy
+    val !i = 0 while i < #spheres; i = i + 1 {
         val sphere ^sphere_t = @spheres[i]
         val d double_t = ray_sphere_intersection(ray, sphere)
         if d > 0.0 & d < t {
             t = d
             id = i
         }
-        i = i + 1
     }
 
     return (t < inf, t, id)
@@ -126,7 +124,7 @@ ext_c get_random() -> double_t -- random number from uniform range of [0, 1]
 fn get_random_signed() -> double_t { -- random from unifrom range of [-1, 1]
     val value double_t = get_random()
     if get_random() < 0.5 {
-        return -1.0 * value
+        return -1 * value
     }
     return value
 }
@@ -144,7 +142,7 @@ fn reflect (ray ^ray_t, hit_point, hit_normal vec3_t, roughness double_t) -> ray
     val r2  double_t = get_random()
     val r2s double_t = sqrt(r2)
 
-    val versor vec3_t = (1.0, 0.0, 0.0)
+    val !versor vec3_t = (1.0, 0.0, 0.0)
     if fabs(hit_normal.x) > 0.1 {
         versor = (0.0, 1.0, 0.0)
     }
@@ -166,7 +164,7 @@ fn reflect (ray ^ray_t, hit_point, hit_normal vec3_t, roughness double_t) -> ray
 fn radiance (ray ^ray_t, spheres ^[sphere_t], depth int_t) -> vec3_t {
     val (intersect bool_t, t double_t, id int_t) = intersects_any(ray, spheres)
     if not intersect {
-        return (0, 0, 0) -- no intersection return black
+        return (0.0, 0.0, 0.0) -- no intersection return black
     }
     val obj ^sphere_t = @spheres[id]
     if depth <= 0 {
@@ -190,7 +188,7 @@ fn cast_ray (camera ^ray_t, x, y double_t) -> ray_t {
     val (nx, ny double_t) = (x - 0.5, 0.5 - y)
     
     val fov double_t = 0.545
-    val img_point vec3_t = (nx * fov, ny * fov, 0)
+    val img_point vec3_t = (nx * fov, ny * fov, 0.0)
     val d vec3_t = vec3_add(img_point, camera->direction)
     val o vec3_t = vec3_add(vec3_scale(d, 140.0), camera->origin)
 
@@ -199,20 +197,15 @@ fn cast_ray (camera ^ray_t, x, y double_t) -> ray_t {
 
 ext_c print_int (a int_t) -> unit_t
 ext_c print_char (a byte_t) -> unit_t
-fn print (str str_t) -> unit_t {
-    val !i int_t = 0
-    while i < #str {
-        print_char(str[i])
-        i = i + 1
-    }
-}
+ext_c puts (a ^byte_t) -> unit_t
+fn print_noln (s str_t) -> unit_t puts(@s[0])
 
 fn print_ppm_header (width, height int_t) -> unit_t {
-    print("P3\n")
+    print_noln("P3\n")
     print_int(width)
-    print(" ")
+    print_noln(" ")
     print_int(height)
-    print("\n255\n")
+    print_noln("\n255\n")
 }
 
 fn correct_gamma (x double_t) -> int_t {
@@ -253,33 +246,28 @@ fn main () -> unit_t {
     ]
     -- PPM header
     print_ppm_header(width, height)
-    -- TODO: fix when more loops are available
     val (!x, !y, !i int_t) = (0, 0, 0)
     val (!nx, !ny, !rnx, !rny double_t) = (0.0, 0.0, 0.0, 0.0)
     val (dx, dy double_t) = (0.7 / width, 0.7 / height) -- pixel size
-    val color vec3_t = (0, 0, 0)
-    val ray ray_t = ((0, 0, 0), (0, 0, 0))
-    while y < height {
-        x = 0
+    val !color vec3_t = (0.0, 0.0, 0.0)
+    val !ray ray_t = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+    while y < height; y = y + 1 {
         ny = y / double_t(height)
-        while x < width {
+        -- TODO: move declaration here when locals allocation is spilled outside the loop
+        x = 0 while x < width; x = x + 1 {
             nx = x / double_t(width)
 
-            i = 0
             color.x = 0
             color.y = 0
             color.z = 0
-            while i < samples {
+            i = 0 while i < samples; i = i + 1 {
                 rnx = nx + get_random_signed() * dx
                 rny = ny + get_random_signed() * dy
                 ray = cast_ray(@camera, rnx, rny)
                 color = vec3_add(color, radiance(@ray, spheres, max_depth))
-                i = i + 1
             }
 
             print_color(vec3_scale(color, 1.0 / samples))
-            x = x + 1
         }
-        y = y + 1
     }
 }

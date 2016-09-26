@@ -93,7 +93,7 @@ fn main () -> int_t {
         print_board(in)
         update(in, out)
 
-        val tmp ^board_t = out
+        val tmp = out
         out = in
         in = tmp
     }
