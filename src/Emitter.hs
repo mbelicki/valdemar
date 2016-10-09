@@ -275,11 +275,15 @@ emitExprForValue e@(S.IntegerExpr _ _) = CG.const <$> emitConstant e
 emitExprForValue e@(S.BooleanExpr _ _) = CG.const <$> emitConstant e
 emitExprForValue (S.VarExpr n ty) = CG.getLocal n >>= CG.load
 emitExprForValue (S.ValDeclExpr (S.ValBind kind name typeName) n ty) = do
-    op <- emitExprForValue n
     ptr <- CG.alloca $ getLLVMType typeName
-    CG.store ptr op
     CG.assignLocal name ptr
-    return op
+    M.unless (isUndefined n) $ do
+        op <- emitExprForValue n
+        M.void $ CG.store ptr op
+    CG.load ptr
+  where
+    isUndefined S.UndefinedExpr{} = True
+    isUndefined e = False
 
 emitExprForValue (S.ValDestructuringExpr bindings n ty) = do
     op <- emitExprForValue n

@@ -246,24 +246,21 @@ fn main () -> unit_t {
     ]
     -- PPM header
     print_ppm_header(width, height)
-    val (!x, !y, !i int_t) = (0, 0, 0)
-    val (!nx, !ny, !rnx, !rny double_t) = (0.0, 0.0, 0.0, 0.0)
     val (dx, dy double_t) = (0.7 / width, 0.7 / height) -- pixel size
     val !color vec3_t = (0.0, 0.0, 0.0)
-    val !ray ray_t = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
-    while y < height; y = y + 1 {
-        ny = y / double_t(height)
+    val !y = 0 while y < height; y = y + 1 {
+        val ny = y / double_t(height)
         -- TODO: move declaration here when locals allocation is spilled outside the loop
-        x = 0 while x < width; x = x + 1 {
-            nx = x / double_t(width)
-
+        val !x = 0 while x < width; x = x + 1 {
+            val nx = x / double_t(width)
+    
             color.x = 0
             color.y = 0
             color.z = 0
-            i = 0 while i < samples; i = i + 1 {
-                rnx = nx + get_random_signed() * dx
-                rny = ny + get_random_signed() * dy
-                ray = cast_ray(@camera, rnx, rny)
+            val !i = 0 while i < samples; i = i + 1 {
+                val rnx = nx + get_random_signed() * dx
+                val rny = ny + get_random_signed() * dy
+                val ray = cast_ray(@camera, rnx, rny)
                 color = vec3_add(color, radiance(@ray, spheres, max_depth))
             }
 

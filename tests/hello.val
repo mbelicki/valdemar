@@ -1,0 +1,5 @@
+ext_c print(s str_t) -> unit_t
+
+fn main() -> unit_t {
+    print("hello, wolrd")
+}

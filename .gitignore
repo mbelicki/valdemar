@@ -1,0 +1,10 @@
+*.ll
+*.o
+*.ppm
+a.out
+
+*.swp
+
+.cabal-sandbox
+cabal.sandbox.config
+dist

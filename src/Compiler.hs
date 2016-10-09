@@ -24,6 +24,8 @@ import qualified Syntax as S
 import qualified Emitter as E
 import qualified TypeChecker as T
 
+import qualified Transformations.LoopAllocator as LoopAllocator
+
 import qualified LLVM.General.Target as LLVM.Targ
 import qualified LLVM.General.Context as LLVM.Ctx
 import qualified LLVM.General.Module as LLVM.Module
@@ -140,9 +142,9 @@ getModuleName pathDelimiter sourcePath
 
 transformAst :: [S.Expression ()] -> F.MaybeAst S.Type
 transformAst ast = do
-    checked <- T.typeCheck ast
-    -- TODO: other transformations here
-    return checked
+    (tree, faults) <- T.typeCheck ast
+    let transformed = LoopAllocator.transform tree
+    return $ (transformed, faults)
 
 applyControlCodes :: String -> String -> String
 applyControlCodes code string = "\x1b" ++ code ++ string ++ "\x1b[0m"

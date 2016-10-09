@@ -5,7 +5,7 @@ module Syntax ( Name
               , TupleFiled(Field)
               , Type(..)
               , isArray, isPointer, isArrayPointer, isFunction
-              , ValueBinding(..), bindingType, FunctionDeclaration(..)
+              , ValueBinding(..), bindingName, bindingType, FunctionDeclaration(..)
               , funDeclToType, nameOfFunDecl
               , Expression(..), tagOfExpr
               , Statement(..)
@@ -114,6 +114,9 @@ isFunction _ = False
 
 data ValueBinding = ValBind BindingKind Name Type deriving (Eq, Ord)
 
+bindingName :: ValueBinding -> Name
+bindingName (ValBind _ n _) = n
+
 bindingType :: ValueBinding -> Type
 bindingType (ValBind _ _ t) = t
 
@@ -135,7 +138,8 @@ nameOfFunDecl :: FunctionDeclaration -> String
 nameOfFunDecl (FunDecl name _ _) = name
 
 data Expression tag
-    = BooleanExpr Bool tag
+    = UndefinedExpr tag
+    | BooleanExpr Bool tag
     | IntegerExpr Int tag
     | CharacterExpr Char tag
     | FloatExpr Double tag
@@ -219,10 +223,24 @@ data Statement a
     deriving (Eq, Ord)
 
 instance Show (Statement a) where
-    show (ReturnStmt e) = "return " ++ show e
-    show (ExpressionStmt e) = show e
-    show (BlockStmt stmts) = "{" ++ List.intercalate "\n" (map show stmts) ++ "}"
-    show (IfStmt cond body) = "if " ++ show cond ++ show body
-    show (WhileStmt cond update body) = "while " ++ show cond ++ show update ++ show body
-    show (AssignmentStmt lhs rhs) = show lhs ++ " = " ++ show rhs
+    show s = printStmt 0 s
 
+indentation :: Int -> String
+indentation n = concat $ replicate n "    "
+
+printStmt :: Int -> Statement a -> String
+printStmt n (ReturnStmt e) = indentation n ++ "return " ++ show e
+printStmt n (ExpressionStmt e) = indentation n ++ show e
+printStmt n (BlockStmt stmts)
+    = "{\n"
+      ++ List.intercalate "\n" (map (printStmt (n + 1)) stmts) 
+      ++ "\n" ++ indentation n ++ "}"
+printStmt n (IfStmt cond body)
+    = indentation n ++ "if " ++ show cond ++ " " ++ printStmt n body
+printStmt n (WhileStmt cond update body)
+    = indentation n
+      ++ "while " ++ show cond 
+      ++ Maybe.maybe "" (\s -> "; " ++ printStmt 0 s) update
+      ++ " " ++ printStmt n body
+printStmt n (AssignmentStmt lhs rhs)
+    = indentation n ++ show lhs ++ " = " ++ show rhs
