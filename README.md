@@ -11,7 +11,7 @@ ext_c cos (a double_t) -> double_t
 ext_c sqrt (a double_t) -> double_t
 
 -- fn denotes a function declaration
--- 'compute' takes one double precision floating point value 
+-- 'compute' takes one double precision floating point value
 -- and returns anonymous tuple with two doubles
 fn compute (a double_t) -> (double_t, double_t) {
     -- val introduces new variable, variables are immutable by defualt
@@ -20,7 +20,7 @@ fn compute (a double_t) -> (double_t, double_t) {
 }
 
 -- here is a named tuple delcaration:
-tuple point_t {
+tuple point_t { -- all types in valdemar have to end with '_t' suffix
     x, y double_t
 }
 
@@ -35,13 +35,13 @@ fn main () -> unit_t {
     -- the array below is allocated on stack and is immutable,
     -- type of 'numbers' is: pointer to array of double_t
     val numbers ^[double_t] = [1.0, 2.0, 4.0, 8.0]
-    -- to create mutable variable simply put exclamation point after val:
-    val !i int_t = 0
-    while i < #numbers { -- # operator returns length of array
-        -- anonymous tuple returned by 'compute' can be assigned to named tuple
-        -- as long as layout of both tuples is the same
+    -- to create mutable variable simply put exclamation sign after val,
+    -- if the type of a variable is not specified then compiler will assume
+    -- that the new variable has the type of right hand side expression
+    val !i = 0 while i < #numbers; i = i + 1 { -- # operator returns length of array
+        -- anonymous tuple returned by 'compute' can be assigned
+        -- to named tuple as long as layout of both tuples is the same
         val p point_t = compute(numbers[i])
-        i = i + 1
     }
 }
 ```
@@ -50,7 +50,8 @@ building
 --------
 
 Current version of compiler is developed in Haskell, project can be compiled on
-GNU/Linux (tested on Ubuntu 16.04 LTS, 64-bit) and macOS (tested on 10.11).
+GNU/Linux (tested on Ubuntu 16.04 LTS, 64-bit) and macOS (tested on 10.11 and
+10.12).
 
 Building valdemar on Ubuntu requires following packages installed:
 
