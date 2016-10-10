@@ -165,6 +165,10 @@ printFaults faults = M.forM_ faults $ \(F.Fault kind msg ctx) -> do
     putStrLn ctx
     putStrLn ""
 
+printParseError :: Show a => a -> IO ()
+printParseError err = printFaults [fault]
+    where fault = F.Fault F.Error "Parsing failed." $ show err
+
 compileAst :: ([S.Expression S.Type] -> IO a) -> F.MaybeAst S.Type -> IO Bool
 compileAst _ (Left faults) = printFaults faults >> return False
 compileAst compile (Right (ast, faults)) = do 
@@ -177,13 +181,13 @@ buildSource filePath options = do
     exists <- Dir.doesFileExist filePath
     if exists
         then do
-            eitherAST <- P.parseModule <$> readFile filePath
+            eitherAST <- P.parseModule <$> return filePath <*> readFile filePath 
             case eitherAST of
                 Right ast -> do 
                     M.when verbose $ putStrLn compileMessage
                     compileAst (E.generate format moduleName outPath) $ transformAst ast
                 Left err -> do 
-                    putStrLn $ "Parsing error: " ++ show err
+                    printParseError err
                     return False
         else do 
             putStrLn $ "File: '" ++ filePath ++ "' could not be open." 

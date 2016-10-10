@@ -57,7 +57,7 @@ typeInteger = (reserved "int_t" >> return (TypeInteger 64))
           <|> (reserved "byte_t" >> return (TypeInteger 8))
 
 typeArray :: Parser Type
-typeArray = M.liftM TypeArray $ brackets typeDecl
+typeArray = (M.liftM TypeArray $ brackets typeDecl) <?> "array type declaration"
 
 typeString :: Parser Type
 typeString = reserved "str_t" >> return (TypePointer $ TypeArray $ TypeInteger 8)
@@ -69,7 +69,9 @@ typePointer = do
     return $ TypePointer ty
 
 typeAnonTuple :: Parser Type
-typeAnonTuple = M.liftM (TypeTuple "" . map (Field "")) $ parens $ commaSep typeDecl
+typeAnonTuple
+    = (M.liftM (TypeTuple "" . map (Field "")) $ parens $ commaSep typeDecl)
+      <?> "anonymous tuple type declaration"
 
 typeUnknow :: Parser Type
 typeUnknow = do
@@ -259,6 +261,7 @@ anyExpr = try floating
       <|> try call
       <|> try elementOf
       <|> variable
+      <?> "expression"
 
 expr :: Parser (Expression ())
 expr = E.buildExpressionParser table anyExpr
@@ -308,6 +311,7 @@ statement = try returnStmt
         <|> try whileStmt
         <|> try assignmentStmt
         <|> try expressionStmt
+        <?> "statement"
 
 contents :: Parser a -> Parser a
 contents p = do
@@ -322,6 +326,6 @@ toplevel = many (function <|> extFunction <|> namedTuple)
 parseExpr :: String -> Either ParseError (Expression ())
 parseExpr = parse (contents expr) "<stdin>"
 
-parseModule :: String -> Either ParseError [Expression ()]
-parseModule = parse (contents toplevel) "<stdin>"
+parseModule :: String -> String -> Either ParseError [Expression ()]
+parseModule = parse (contents toplevel)
 
