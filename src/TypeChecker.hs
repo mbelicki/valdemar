@@ -163,14 +163,6 @@ fetchDeclType name e = do
         createFault F.Error msg ctx
     return $ maybe S.TypeBottom (fst . snd) maybeDecl
 
-isTuple :: S.Type -> Bool
-isTuple (S.TypeTuple _ _) = True
-isTuple _ = False
-
-isPointer :: S.Type -> Bool
-isPointer (S.TypePointer _) = True
-isPointer _ = False
-
 -- entry point:
 
 typeCheck :: [S.Expression ()] -> F.MaybeAst S.Type
@@ -305,6 +297,7 @@ canCastImplicitly _ _ = False
 castExprImplicitly :: S.Type -> S.Expression S.Type -> TypeChecker (S.Expression S.Type)
 castExprImplicitly desiredType typedExpr
      | not castNeeded = return typedExpr
+     | unitCast = return $ S.UnitExpr S.TypeUnit
      | castPossible = return $ S.CastExpr desiredType typedExpr desiredType
      | otherwise = do
         createFault F.Error failMsg failCtx
@@ -313,6 +306,7 @@ castExprImplicitly desiredType typedExpr
     actualType = S.tagOfExpr typedExpr
     castNeeded = needsCast actualType desiredType
     castPossible = canCastImplicitly actualType desiredType
+    unitCast = S.isEmptyTuple actualType && desiredType == S.TypeUnit
 
     failMsg = "Cannot implicitly cast: '" ++ show actualType ++ "' to '" 
         ++ show desiredType ++ "'."
@@ -413,12 +407,12 @@ transformExpression e@(S.BinOpExpr S.MemberOf arg (S.VarExpr name _) _) = do
     ty <- resolveType $ S.tagOfExpr typed
     let failContext = "In expression: '" ++ show e ++ "'"
 
-    M.unless (isTuple ty) $ do
+    M.unless (S.isTuple ty) $ do
         let msg = "Cannot access member of: '" ++ show arg 
                   ++ "', expression is not a tuple."
         createFault F.Error msg failContext
     
-    let S.TypeTuple tupleName fields = if isTuple ty then ty else S.TypeTuple "" []
+    let S.TypeTuple tupleName fields = if S.isTuple ty then ty else S.TypeTuple "" []
         maybeField = findField fields name
 
     M.unless (Maybe.isJust maybeField) $ do 
@@ -633,12 +627,6 @@ transformStatement s@(S.ReturnStmt rawExpr) = do
         funType = maybe S.TypeBottom (fst . snd) maybeFunDecl
 
     retType <- resolveType $ getRetType funType
-    M.when (retType == S.TypeUnit) $ do
-        let msg = "Cannot use return statement in function returning 'unit_t'."
-            ctx = "Function '" ++ funName ++ "' is declared as: '" 
-                  ++ show funType ++ "'"
-        createFault F.Error msg ctx
-
     typedExpr <- transformExpression rawExpr >>= castExprImplicitly retType
     return $ S.ReturnStmt typedExpr
   where

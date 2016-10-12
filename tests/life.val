@@ -17,9 +17,8 @@ fn get (b ^board_t, i, j int_t) -> int_t {
 }
 
 fn set (b ^board_t, i, j int_t, v int_t) -> unit_t {
-    -- TODO: language error, return without value impossible
-    -- if i < 0 | i >= b->width return
-    -- if j < 0 | j >= b->height return
+    if i < 0 | i >= b->width { return () }
+    if j < 0 | j >= b->height { return () }
 
     b->data[i + j * b->width] = v
 }

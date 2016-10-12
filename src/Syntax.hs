@@ -4,7 +4,7 @@ module Syntax ( Name
               , BitCount
               , TupleFiled(Field)
               , Type(..)
-              , isArray, isPointer, isArrayPointer, isFunction
+              , isArray, isPointer, isTuple, isEmptyTuple, isArrayPointer, isFunction
               , ValueBinding(..), bindingName, bindingType, FunctionDeclaration(..)
               , funDeclToType, nameOfFunDecl
               , Expression(..), tagOfExpr
@@ -104,6 +104,14 @@ isPointer :: Type -> Bool
 isPointer TypePointer{} = True
 isPointer _ = False
 
+isTuple :: Type -> Bool
+isTuple TypeTuple{} = True
+isTuple _ = False
+
+isEmptyTuple :: Type -> Bool
+isEmptyTuple (TypeTuple _ []) = True
+isEmptyTuple _ = False
+
 isArrayPointer :: Type -> Bool
 isArrayPointer (TypePointer ty) = isArray ty
 isArrayPointer _ = False
@@ -138,7 +146,8 @@ nameOfFunDecl :: FunctionDeclaration -> String
 nameOfFunDecl (FunDecl name _ _) = name
 
 data Expression tag
-    = UndefinedExpr tag
+    = UnitExpr tag
+    | UndefinedExpr tag
     | BooleanExpr Bool tag
     | IntegerExpr Int tag
     | CharacterExpr Char tag
@@ -197,6 +206,8 @@ instance Show (Expression a) where
     show expr = "<failed to print expression>"
 
 tagOfExpr :: Expression a -> a
+tagOfExpr (UnitExpr tag) = tag
+tagOfExpr (UndefinedExpr tag) = tag
 tagOfExpr (BooleanExpr _ tag) = tag
 tagOfExpr (IntegerExpr _ tag) = tag
 tagOfExpr (FloatExpr _ tag) = tag

@@ -267,10 +267,10 @@ expr :: Parser (Expression ())
 expr = E.buildExpressionParser table anyExpr
 
 returnStmt :: Parser (Statement ())
-returnStmt = do
+returnStmt = (do
     reserved "return"
     e <- expr
-    return $ ReturnStmt e
+    return $ ReturnStmt e) <?> "return statement"
 
 expressionStmt :: Parser (Statement ())
 expressionStmt = do
@@ -278,14 +278,14 @@ expressionStmt = do
     return $ ExpressionStmt e
 
 blockStmt :: Parser (Statement ())
-blockStmt = braces $ M.liftM BlockStmt $ many statement
+blockStmt = (braces $ M.liftM BlockStmt $ many statement) <?> "block statement"
 
 ifStmt :: Parser (Statement ())
-ifStmt = do
+ifStmt = (do
     reserved "if" 
     cond <- expr
     body <- blockStmt
-    return $ IfStmt cond body
+    return $ IfStmt cond body) <?> "if statement"
 
 whileStmt :: Parser (Statement ())
 whileStmt = do

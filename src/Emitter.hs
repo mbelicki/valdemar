@@ -88,7 +88,9 @@ generateCommonDecls = do
 
 emitStatement :: S.Statement S.Type -> CG.CodeGenerator ()
 emitStatement (S.ExpressionStmt n) = M.void $ emitExprForValue n
-emitStatement (S.ReturnStmt n) = M.void $ emitExprForValue n >>= CG.ret
+emitStatement (S.ReturnStmt n) = M.void $ if S.tagOfExpr n == S.TypeUnit 
+                                          then CG.retVoid
+                                          else emitExprForValue n >>= CG.ret
 emitStatement (S.BlockStmt n) = M.forM_ n emitStatement
 emitStatement (S.IfStmt cond body) = do
     thenBlock <- CG.addBlock "if.then"
